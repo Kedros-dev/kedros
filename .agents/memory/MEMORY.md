@@ -1,0 +1,1 @@
+- [Vite JSX runtime](vite-jsx-runtime.md) — keep an explicit React import in JSX components for the current preview transform.

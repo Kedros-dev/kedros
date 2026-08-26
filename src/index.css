@@ -100,7 +100,7 @@ h1 em { color: #642dd4; font-style: normal; }
 .section-heading { max-width: 540px; }
 .section-heading h2 { color: #0f134e; font-size: clamp(34px, 4vw, 52px); font-weight: 600; letter-spacing: -.065em; line-height: 1.1; margin-bottom: 20px; }
 .section-copy { color: #656989; font-size: 14px; line-height: 1.75; max-width: 395px; }
-.services-grid { border-bottom: 1px solid #cad4e1; border-top: 1px solid #cad4e1; display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 68px; }
+.services-grid { border-bottom: 1px solid #cad4e1; border-top: 1px solid #cad4e1; display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 68px; }
 .service-card { border-right: 1px solid #cad4e1; min-height: 380px; padding: 25px 27px 24px; position: relative; }
 .service-card:first-child { border-left: 1px solid #cad4e1; }
 .service-top { align-items: center; display: flex; justify-content: space-between; margin-bottom: 55px; }
@@ -111,6 +111,15 @@ h1 em { color: #642dd4; font-style: normal; }
 .service-card .service-detail { color: #0f134e; font-size: 11px; line-height: 1.65; }
 .card-link, .project-link { align-items: center; bottom: 24px; color: #0f134e; display: inline-flex; font-size: 10px; font-weight: 600; gap: 7px; position: absolute; }
 .card-link svg, .project-link svg { color: #642dd4; }
+
+.automation-section { background: #fff; }
+.automation-grid { align-items: start; display: grid; gap: 15%; grid-template-columns: .9fr 1.1fr; }
+.automation-points { border-top: 1px solid #cad4e1; margin-top: 4px; }
+.automation-point { align-items: flex-start; border-bottom: 1px solid #cad4e1; display: grid; gap: 22px; grid-template-columns: 43px 1fr; padding: 25px 0 24px; }
+.automation-icon { align-items: center; background: #f1edfB; border-radius: 50%; color: #642dd4; display: flex; height: 40px; justify-content: center; width: 40px; }
+.automation-index { color: #642dd4; display: block; font-family: "DM Mono"; font-size: 9px; letter-spacing: .08em; margin-bottom: 10px; }
+.automation-point h3 { color: #0f134e; font-size: 16px; font-weight: 700; letter-spacing: -.035em; margin-bottom: 8px; }
+.automation-point p { color: #656989; font-size: 12px; line-height: 1.7; margin: 0; max-width: 330px; }
 
 .value-section { background: #0f134e; color: #fff; }
 .value-grid { display: grid; gap: 13%; grid-template-columns: 1fr 1.1fr; }
@@ -206,8 +215,9 @@ h1 em { color: #642dd4; font-style: normal; }
   .hero-scroll { display: none; }
   .services-grid { grid-template-columns: repeat(2, 1fr); }
   .service-card:nth-child(2) { border-right: 0; }
-  .service-card:nth-child(3), .service-card:nth-child(4) { border-top: 1px solid #cad4e1; }
+  .service-card:nth-child(3) { border-top: 1px solid #cad4e1; }
   .value-grid, .contact-grid { gap: 50px; grid-template-columns: 1fr; }
+  .automation-grid { gap: 50px; grid-template-columns: 1fr; }
   .value-intro > p:not(.eyebrow) { max-width: 420px; }
   .principles-list { margin-top: 0; }
   .contact-grid { gap: 60px; }

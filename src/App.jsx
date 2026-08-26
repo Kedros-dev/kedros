@@ -9,21 +9,20 @@ import {
   Instagram,
   Linkedin,
   Menu,
-  PenTool,
   Send,
   Sparkles,
-  X,
-  Wrench
+  Workflow,
+  X
 } from "lucide-react";
 
 const services = [
   {
     number: "01",
-    icon: Code2,
-    title: "Custom software development",
+    icon: BrainCircuit,
+    title: "Custom software & automation",
     description:
       "Bespoke web and business applications that fit your processes, your people, and your next stage of growth.",
-    detail: "AI integrations, automations, and the tools your team already needs — built in from the start."
+    detail: "Automate repetitive admin, connect your tools, and add AI where it creates real leverage."
   },
   {
     number: "02",
@@ -36,18 +35,28 @@ const services = [
   {
     number: "03",
     icon: Sparkles,
-    title: "Marketing",
+    title: "Growth & brand",
     description:
-      "Clear strategy and thoughtful execution to help your business reach the right customers and earn their attention.",
-    detail: "Delivered in-house or with trusted partners, depending on what will serve you best."
+      "Marketing strategy and professional photography that help your business reach the right people and earn their attention.",
+    detail: "In-house or partner-delivered support, from brand imagery to the campaigns that put it to work."
+  }
+];
+
+const automationPoints = [
+  {
+    icon: Workflow,
+    title: "Connect the moving parts",
+    copy: "Bring the tools your team already uses into one clear, connected workflow."
   },
   {
-    number: "04",
-    icon: PenTool,
-    title: "Photography",
-    description:
-      "Professional visual content that gives your business the presence it deserves across every touchpoint.",
-    detail: "Product photography, brand imagery, and the assets that make your work easier to choose."
+    icon: BrainCircuit,
+    title: "Remove the busywork",
+    copy: "Turn repetitive tasks into reliable automations so your team can focus on higher-value work."
+  },
+  {
+    icon: Code2,
+    title: "Build for what’s next",
+    copy: "Create a flexible foundation that can grow with your business instead of holding it back."
   }
 ];
 
@@ -74,7 +83,7 @@ const projects = [
   {
     category: "Growth · Digital",
     title: "A better way to grow",
-    description: "A tailored digital foundation designed for the next chapter of a growing business.",
+    description: "A tailored digital foundation that connects growth activity with the rest of the business.",
     className: "project-growth"
   }
 ];
@@ -148,7 +157,7 @@ function App() {
               <p className="eyebrow hero-eyebrow"><span className="eyebrow-line" /> Independent software studio</p>
               <h1>Software built<br /><em>around your business.</em></h1>
               <p className="hero-description">
-                We build the custom systems and digital tools that make ambitious small businesses work better.
+                We build custom software that removes repetitive work, connects your business, and gives your team room to do more.
               </p>
               <div className="hero-actions">
                 <a className="button button-primary" href="#contact">Start a project <ArrowUpRight size={17} /></a>
@@ -156,7 +165,7 @@ function App() {
               </div>
               <div className="hero-note">
                 <span className="note-dot" />
-                <span>Thoughtful technology. Practical outcomes.</span>
+                <span>Automate the repetitive. Focus on the important.</span>
               </div>
             </div>
             <div className="hero-visual" aria-label="Kedros business development">
@@ -182,12 +191,12 @@ function App() {
             <p className="eyebrow">What we believe</p>
             <div>
               <p className="statement">
-                Your business is <span>unique.</span><br />
-                Your software should be too.
+                The best software doesn&apos;t just store information.<br />
+                It <span>takes work off your plate.</span>
               </p>
               <div className="statement-foot">
                 <span className="statement-rule" />
-                <p>We bring the care of a small studio and the capability to build things that last.</p>
+                <p>We bring the care of a small studio and the capability to build systems that make a measurable difference.</p>
               </div>
             </div>
           </div>
@@ -197,8 +206,8 @@ function App() {
           <div className="container">
             <SectionLabel
               eyebrow="What we do"
-              title={<>The right tools for<br /><span>the real work.</span></>}
-              copy="From a first idea to the systems that keep a business moving, we make technology feel simpler and more useful."
+              title={<>Software that makes<br /><span>business easier.</span></>}
+              copy="We turn manual processes into dependable systems — from focused automations to the custom platforms that run an entire operation."
             />
             <div className="services-grid">
               {services.map(({ number, icon: Icon, title, description, detail }) => (
@@ -217,11 +226,33 @@ function App() {
           </div>
         </section>
 
+        <section className="automation-section section-pad">
+          <div className="container automation-grid">
+            <SectionLabel
+              eyebrow="The software advantage"
+              title={<>Stop doing work<br /><span>software can handle.</span></>}
+              copy="A smarter workflow is not about adding more tools. It is about making the right work happen automatically, in the background."
+            />
+            <div className="automation-points">
+              {automationPoints.map(({ icon: Icon, title, copy }, index) => (
+                <div className="automation-point" key={title}>
+                  <div className="automation-icon"><Icon size={20} strokeWidth={1.7} /></div>
+                  <div>
+                    <span className="automation-index">0{index + 1}</span>
+                    <h3>{title}</h3>
+                    <p>{copy}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         <section className="value-section section-pad">
           <div className="container value-grid">
             <div className="value-intro">
               <p className="eyebrow">Why Kedros</p>
-              <h2>Built with care.<br /><span>Priced fairly.</span></h2>
+              <h2>More done.<br /><span>Less repeated.</span></h2>
               <p>Good software should move your business forward — not make you change the way you work to fit it.</p>
               <a href="#contact" className="text-link text-link-light">Let&apos;s talk <ArrowUpRight size={16} /></a>
             </div>
@@ -241,7 +272,7 @@ function App() {
           <div className="container">
             <div className="work-heading">
               <SectionLabel eyebrow="Selected work" title={<>Useful work for<br /><span>real businesses.</span></>} />
-              <p>Just a few examples of the kinds of challenges we love to solve. More coming soon.</p>
+              <p>Just a few examples of the kinds of business challenges we love to solve with custom software. More coming soon.</p>
             </div>
             <div className="projects-grid">
               {projects.map((project, index) => (
