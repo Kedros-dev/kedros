@@ -1,0 +1,20 @@
+Build the frontend for a business landing site for my company, Kedros (domain: kedros.dev). This is display-only for now — no backend, no forms that submit anywhere, no payment integration yet (Stripe will be added later). Just a clean, professional static/frontend site.
+
+Brand tone: Professional, established, trustworthy — not flashy or startup-cute. We build custom, affordable software for small and medium businesses. Think serious consultancy energy, similar to how a boutique agency or studio would present itself.
+
+Pages/Sections needed:
+
+Hero section — Company name (Kedros), a short tagline communicating "custom software built around your business," and a brief one-line description. Include a primary CTA button (e.g. "Get in Touch" or "Start a Project") linking to the contact section.
+Services section — four distinct service offerings, each with an icon, short title, and 2-3 sentence description:
+Custom Software Development — bespoke web and business applications, including AI-powered features and integrations built into the software (not sold as a separate AI service, just mention AI integrations as part of what custom builds can include)
+Full ERP Systems — customized enterprise resource planning systems tailored to how the client's business actually operates, not off-the-shelf
+Marketing — [in-house or partner-delivered] marketing services to help clients grow their reach and customer base
+Photography — [in-house or partner-delivered] professional photography services for businesses (product photography, branding imagery, etc.)
+Why Kedros / Value Proposition section — a short section on what differentiates us: affordable pricing for small businesses, fully custom (not templated) solutions, personal/close client relationships, ongoing support and maintenance included.
+Portfolio/Work section — a placeholder grid for 2-3 project case studies (use generic placeholder content for now, e.g. 'Bakery Management System' and 'Audit Firm Software' as example project cards with a short description each — I'll swap in real details later)
+Contact section — a contact form (frontend only, no submission logic yet) with Name, Email, Message fields, plus display our contact email as info@kedros.dev. Include a 'Book a call' style CTA as well.
+Footer — company name, a short copyright line, and social links placeholders (LinkedIn, etc.)
+
+Design direction: Clean, modern, minimal — generous white space, a professional color palette (something like deep navy/charcoal with a single accent color, avoid anything too playful or bright). Use a clean sans-serif font pairing. Fully responsive for mobile.
+
+Tech: Use React with Tailwind CSS. Keep it as a single well-organized frontend project, no backend routes needed yet — I'll wire up Stripe and a contact form backend later."
