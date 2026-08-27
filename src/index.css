@@ -30,7 +30,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
   z-index: 20;
 }
 .nav-wrap { align-items: center; display: flex; height: 100%; justify-content: space-between; }
-.brand-mark { align-items: center; display: inline-flex; gap: 11px; }
+.brand-mark { align-items: center; display: inline-flex; gap: 13px; }
+.brand-symbol-image { display: block; height: 31px; object-fit: contain; width: 36px; }
+.brand-wordmark-image { display: block; height: 24px; object-fit: contain; width: 111px; }
 .brand-word { font-family: "Manrope", sans-serif; font-size: 19px; font-weight: 800; letter-spacing: .23em; line-height: 1; }
 .brand-word span { color: #642dd4; position: relative; }
 .brand-word span::after { background: #642dd4; bottom: -4px; content: ""; height: 3px; left: -1px; position: absolute; width: 14px; }

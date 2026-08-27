@@ -91,14 +91,23 @@ const projects = [
 function Logo({ compact = false, light = false }) {
   return (
     <a href="#top" className={`brand-mark ${light ? "brand-mark-light" : ""}`} aria-label="Kedros home">
-      <span className="brand-symbol" aria-hidden="true">
-        <span className="brand-arrow" />
-        <span className="brand-b" />
-      </span>
-      {!compact && (
-        <span className="brand-word">
-          KEDR<span>O</span>S
-        </span>
+      {light ? (
+        <>
+          <span className="brand-symbol" aria-hidden="true">
+            <span className="brand-arrow" />
+            <span className="brand-b" />
+          </span>
+          {!compact && (
+            <span className="brand-word">
+              KEDR<span>O</span>S
+            </span>
+          )}
+        </>
+      ) : (
+        <>
+          <img className="brand-symbol-image" src="/assets/kedros-symbol-brand.png" alt="" />
+          {!compact && <img className="brand-wordmark-image" src="/assets/kedros-wordmark-brand.png" alt="Kedros Business Development" />}
+        </>
       )}
     </a>
   );
