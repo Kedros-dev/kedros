@@ -67,23 +67,23 @@ const principles = [
   "Ongoing support and maintenance, included as standard"
 ];
 
-const projects = [
+const industries = [
   {
-    category: "Operations · Systems",
-    title: "Bakery management system",
-    description: "A clearer way to coordinate production, inventory, and daily orders.",
+    category: "Food & hospitality · Software",
+    title: "Food & hospitality",
+    description: "Custom systems for production, inventory, orders, and the daily work that keeps things moving.",
     className: "project-bakery"
   },
   {
     category: "Professional services · Software",
-    title: "Audit firm software",
-    description: "One connected workspace for client work, reporting, and team visibility.",
+    title: "Professional services",
+    description: "Connected workspaces for client work, reporting, approvals, and team visibility.",
     className: "project-audit"
   },
   {
-    category: "Growth · Digital",
-    title: "A better way to grow",
-    description: "A tailored digital foundation that connects growth activity with the rest of the business.",
+    category: "Retail & growth · Digital",
+    title: "Retail & growing businesses",
+    description: "Digital foundations that connect customer journeys, marketing, and operations as you grow.",
     className: "project-growth"
   }
 ];
@@ -280,21 +280,21 @@ function App() {
         <section className="work-section section-pad" id="work">
           <div className="container">
             <div className="work-heading">
-              <SectionLabel eyebrow="Selected work" title={<>Useful work for<br /><span>real businesses.</span></>} />
-              <p>Just a few examples of the kinds of business challenges we love to solve with custom software. More coming soon.</p>
+              <SectionLabel eyebrow="Industries we support" title={<>Software for the way<br /><span>your industry works.</span></>} />
+              <p>We build practical systems around the needs of the industries and teams we work with.</p>
             </div>
             <div className="projects-grid">
-              {projects.map((project, index) => (
-                <article className={`project-card ${project.className}`} key={project.title}>
+              {industries.map((industry, index) => (
+                <article className={`project-card ${industry.className}`} key={industry.title}>
                   <div className="project-art" aria-hidden="true">
                     {index === 0 && <><div className="art-window"><span /><span /><span /></div><div className="art-loaf">⌁</div></>}
                     {index === 1 && <><div className="art-columns"><span /><span /><span /><span /></div><div className="art-check">✓</div></>}
                     {index === 2 && <><div className="art-bars"><span /><span /><span /><span /></div><div className="art-spark">✦</div></>}
                   </div>
-                  <div className="project-meta"><span>{project.category}</span><span>0{index + 1}</span></div>
-                  <h3>{project.title}</h3>
-                  <p>{project.description}</p>
-                  <a href="#contact" className="project-link">View project <ArrowUpRight size={16} /></a>
+                  <div className="project-meta"><span>{industry.category}</span><span>0{index + 1}</span></div>
+                  <h3>{industry.title}</h3>
+                  <p>{industry.description}</p>
+                  <a href="#contact" className="project-link">Explore the fit <ArrowUpRight size={16} /></a>
                 </article>
               ))}
             </div>
