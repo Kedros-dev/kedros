@@ -187,7 +187,10 @@ function ClientRow({ client, open, onToggle, onChanged }) {
       body: JSON.stringify(bill)
     });
     if (data) {
-      setMsg(`Invoice ${data.invoice.number || ""} sent.`);
+      setMsg(
+        `Invoice ${data.invoice.number || ""} created — it's on the client's account page.` +
+          (data.invoice.emailed ? " Emailed to the client." : "")
+      );
       setBill({ amountDollars: "", description: "" });
     }
   };

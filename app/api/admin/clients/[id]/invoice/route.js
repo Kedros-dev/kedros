@@ -28,10 +28,15 @@ export async function POST(request, { params }) {
   }
 
   try {
-    const invoice = await createAndSendInvoice(prisma, client, amountCents, description);
+    const { invoice, emailed } = await createAndSendInvoice(prisma, client, amountCents, description);
     return NextResponse.json({
       ok: true,
-      invoice: { id: invoice.id, number: invoice.number, hostedInvoiceUrl: invoice.hosted_invoice_url }
+      invoice: {
+        id: invoice.id,
+        number: invoice.number,
+        hostedInvoiceUrl: invoice.hosted_invoice_url,
+        emailed
+      }
     });
   } catch (err) {
     console.error("Invoice creation failed:", err.message);
