@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
+import BrandMark from "../BrandMark";
 
 function formatCents(cents) {
   return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -53,13 +54,7 @@ export default function AccountView({ user, invoices }) {
       <div className="container">
         <div className="dash-header">
           <div>
-            <Link href="/" className="brand-mark" aria-label="Kedros home">
-              <span className="brand-symbol" aria-hidden="true">
-                <span className="brand-arrow" />
-                <span className="brand-b" />
-              </span>
-              <span className="brand-word">KEDR<span>O</span>S</span>
-            </Link>
+            <BrandMark />
             <h1 style={{ marginTop: 18 }}>Welcome, {user.name}</h1>
           </div>
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import BrandMark from "../../BrandMark";
 
 export default function ChangePasswordView({ forced }) {
   const [form, setForm] = useState({ currentPassword: "", newPassword: "", confirm: "" });
@@ -39,9 +40,7 @@ export default function ChangePasswordView({ forced }) {
   return (
     <div className="auth-shell">
       <div className="auth-card">
-        <Link href="/" className="brand-mark" aria-label="Kedros home">
-          <span className="brand-word">KEDR<span>O</span>S</span>
-        </Link>
+        <BrandMark />
         <h1>Change password</h1>
         <p>
           {forced
