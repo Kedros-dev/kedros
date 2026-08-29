@@ -87,7 +87,7 @@ export async function POST(request) {
   // The setup fee is just the client's first invoice.
   if (oneTimeAmountCents > 0) {
     try {
-      await createAndSendInvoice(prisma, client, oneTimeAmountCents, "Setup fee");
+      await createAndSendInvoice(prisma, client, oneTimeAmountCents, "Setup fee", { kind: "setup_fee" });
     } catch (err) {
       console.error("Failed to create setup-fee invoice:", err.message);
     }

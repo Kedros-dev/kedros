@@ -68,6 +68,11 @@ export async function POST(request) {
           data: { subscriptionStatus: "ACTIVE" }
         });
       }
+      if (invoice.metadata?.kind === "setup_fee" && invoice.metadata.userId) {
+        await prisma.user
+          .update({ where: { id: invoice.metadata.userId }, data: { oneTimePaidAt: new Date() } })
+          .catch(() => {});
+      }
       break;
     }
 

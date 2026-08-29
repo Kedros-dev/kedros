@@ -76,7 +76,7 @@ export async function PATCH(request, { params }) {
     }
     data.email = email;
   }
-  if (body.oneTimeAmountDollars !== undefined) {
+  if (body.oneTimeAmountDollars !== undefined && !client.oneTimePaidAt) {
     data.oneTimeAmountCents = Math.round(Number(body.oneTimeAmountDollars || 0) * 100);
   }
   if (body.monthlyAmountDollars !== undefined) {

@@ -210,7 +210,7 @@ function ClientRow({ client, open, onToggle, onChanged }) {
     <>
       <tr>
         <td>{client.name}<br /><span style={{ color: "#656989", fontSize: 11 }}>{client.email}</span></td>
-        <td>{formatCents(client.oneTimeAmountCents)}</td>
+        <td>{formatCents(client.oneTimeAmountCents)}{client.oneTimePaidAt && <span style={{ color: "#1f7a3d", fontSize: 11 }}><br />paid</span>}</td>
         <td>{formatCents(client.monthlyAmountCents)}/mo</td>
         <td><span className={`dash-status dash-status-${client.subscriptionStatus.toLowerCase()}`}>{client.subscriptionStatus}</span></td>
         <td><span className={`dash-status dash-status-${client.isActive ? "paid" : "unpaid"}`}>{client.isActive ? "Active" : "Deactivated"}</span></td>
@@ -227,7 +227,19 @@ function ClientRow({ client, open, onToggle, onChanged }) {
                 <strong style={{ fontSize: 12, letterSpacing: 0.4 }}>DETAILS</strong>
                 <label>Name<input value={edit.name} onChange={editField("name")} /></label>
                 <label>Email<input type="email" value={edit.email} onChange={editField("email")} /></label>
-                <label>Setup fee (USD)<input type="number" min="0" step="0.01" value={edit.oneTimeAmountDollars} onChange={editField("oneTimeAmountDollars")} /></label>
+                <label>Setup fee (USD)
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={edit.oneTimeAmountDollars}
+                    onChange={editField("oneTimeAmountDollars")}
+                    disabled={Boolean(client.oneTimePaidAt)}
+                  />
+                  {client.oneTimePaidAt && (
+                    <span style={{ color: "#656989", fontSize: 11 }}>Paid — locked</span>
+                  )}
+                </label>
                 <label>Monthly (USD)<input type="number" min="0" step="0.01" value={edit.monthlyAmountDollars} onChange={editField("monthlyAmountDollars")} /></label>
                 <button className="button button-primary" onClick={saveEdit} disabled={busy === "edit"}>{busy === "edit" ? "Saving..." : "Save details"}</button>
               </div>
