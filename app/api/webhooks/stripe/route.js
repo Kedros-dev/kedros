@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 function mapSubscriptionStatus(stripeStatus) {
   if (stripeStatus === "active" || stripeStatus === "trialing") return "ACTIVE";
   if (stripeStatus === "past_due" || stripeStatus === "unpaid") return "PAST_DUE";
@@ -24,6 +26,12 @@ export async function POST(request) {
       const session = event.data.object;
       const userId = session.metadata?.userId;
       if (!userId) break;
+
+      if (session.customer) {
+        await prisma.user
+          .update({ where: { id: userId }, data: { stripeCustomerId: session.customer } })
+          .catch(() => {});
+      }
 
       if (session.metadata.type === "one_time") {
         await prisma.user.update({
@@ -54,6 +62,17 @@ export async function POST(request) {
         where: { subscriptionId: subscription.id },
         data: { subscriptionStatus: "CANCELED" }
       });
+      break;
+    }
+
+    case "invoice.paid": {
+      const invoice = event.data.object;
+      if (invoice.subscription) {
+        await prisma.user.updateMany({
+          where: { subscriptionId: invoice.subscription },
+          data: { subscriptionStatus: "ACTIVE" }
+        });
+      }
       break;
     }
 
