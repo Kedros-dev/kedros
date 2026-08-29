@@ -107,3 +107,27 @@ export async function PATCH(request, { params }) {
   return NextResponse.json({ ok: true, isActive: updated.isActive });
 }
 
+// Permanently remove a client account. Best-effort cancels their subscription;
+// the Stripe customer + invoice history are left intact as the billing record.
+export async function DELETE(_request, { params }) {
+  if (!(await requireAdmin())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const client = await prisma.user.findUnique({ where: { id: params.id } });
+  if (!client || client.role !== "CLIENT") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (client.subscriptionId) {
+    try {
+      await stripe.subscriptions.cancel(client.subscriptionId);
+    } catch (err) {
+      console.warn("Could not cancel subscription on delete:", err.message);
+    }
+  }
+
+  await prisma.user.delete({ where: { id: client.id } });
+  return NextResponse.json({ ok: true });
+}
+

@@ -203,6 +203,14 @@ function ClientRow({ client, open, onToggle, onChanged }) {
     }
   };
 
+  const deleteClient = async () => {
+    if (!window.confirm(`Permanently delete ${client.name}? Their Stripe invoice history is kept, but the login and account are removed.`)) {
+      return;
+    }
+    const data = await call("delete", `/api/admin/clients/${client.id}`, { method: "DELETE" });
+    if (data) onChanged();
+  };
+
   const editField = (field) => (e) => setEdit((p) => ({ ...p, [field]: e.target.value }));
   const billField = (field) => (e) => setBill((p) => ({ ...p, [field]: e.target.value }));
 
@@ -259,6 +267,7 @@ function ClientRow({ client, open, onToggle, onChanged }) {
                 {client.subscriptionStatus === "ACTIVE" && (
                   <button className="dash-signout" onClick={cancelSub} disabled={busy === "cancelsub"}>Cancel subscription</button>
                 )}
+                <button className="dash-signout" onClick={deleteClient} disabled={busy === "delete"} style={{ color: "#b3261e", borderColor: "#b3261e" }}>Delete client</button>
               </div>
             </div>
           </td>
