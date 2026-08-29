@@ -12,6 +12,7 @@ export async function POST(request) {
 
   const user = await prisma.user.findUnique({ where: { id: session.user.id } });
   if (!user) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!user.isActive) return NextResponse.json({ error: "Account deactivated." }, { status: 403 });
 
   if (user.monthlyAmountCents <= 0) {
     return NextResponse.json({ error: "No monthly subscription configured for this account." }, { status: 400 });

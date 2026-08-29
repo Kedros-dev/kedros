@@ -27,6 +27,10 @@ model User {
   role        Role     @default(CLIENT)
   createdAt   DateTime @default(now())
 
+  // Admin-controlled account state.
+  isActive           Boolean @default(true)
+  mustChangePassword Boolean @default(true)
+
   // Per-client pricing, set by the admin when onboarding.
   oneTimeAmountCents  Int @default(0)
   monthlyAmountCents  Int @default(0)

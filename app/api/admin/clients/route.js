@@ -4,7 +4,9 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { stripe } from "@/lib/stripe";
+import { stripe, createAndSendInvoice } from "@/lib/stripe";
+
+export const dynamic = "force-dynamic";
 
 async function requireAdmin() {
   const session = await getServerSession(authOptions);
@@ -27,6 +29,8 @@ export async function GET() {
       monthlyAmountCents: true,
       oneTimePaidAt: true,
       subscriptionStatus: true,
+      subscriptionId: true,
+      isActive: true,
       createdAt: true
     }
   });
@@ -75,9 +79,19 @@ export async function POST(request) {
       role: "CLIENT",
       oneTimeAmountCents,
       monthlyAmountCents,
-      stripeCustomerId: customer.id
+      stripeCustomerId: customer.id,
+      mustChangePassword: true
     }
   });
+
+  // The setup fee is just the client's first invoice.
+  if (oneTimeAmountCents > 0) {
+    try {
+      await createAndSendInvoice(prisma, client, oneTimeAmountCents, "Setup fee");
+    } catch (err) {
+      console.error("Failed to create setup-fee invoice:", err.message);
+    }
+  }
 
   return NextResponse.json({
     client: { id: client.id, name: client.name, email: client.email },
