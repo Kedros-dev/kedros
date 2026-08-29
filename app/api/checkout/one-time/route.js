@@ -1,0 +1,45 @@
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { stripe } from "@/lib/stripe";
+
+export async function POST(request) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+  if (!user) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  if (user.oneTimeAmountCents <= 0) {
+    return NextResponse.json({ error: "No setup fee configured for this account." }, { status: 400 });
+  }
+  if (user.oneTimePaidAt) {
+    return NextResponse.json({ error: "Setup fee already paid." }, { status: 400 });
+  }
+
+  const origin = request.headers.get("origin") || process.env.NEXTAUTH_URL;
+
+  const checkoutSession = await stripe.checkout.sessions.create({
+    mode: "payment",
+    customer: user.stripeCustomerId,
+    line_items: [
+      {
+        price_data: {
+          currency: "usd",
+          unit_amount: user.oneTimeAmountCents,
+          product_data: {
+            name: `Kedros — Setup fee (${user.name})`
+          }
+        },
+        quantity: 1
+      }
+    ],
+    invoice_creation: { enabled: true },
+    success_url: `${origin}/account?paid=1`,
+    cancel_url: `${origin}/account`,
+    metadata: { userId: user.id, type: "one_time" }
+  });
+
+  return NextResponse.json({ url: checkoutSession.url });
+}
