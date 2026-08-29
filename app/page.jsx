@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   ArrowUpRight,
@@ -17,7 +17,7 @@ import {
   X
 } from "lucide-react";
 
-const CAL_LINK = "jasongreich/demo";
+const BOOKING_URL = "https://cal.com/jasongreich/demo";
 
 const services = [
   {
@@ -132,49 +132,6 @@ export default function Home() {
 
   const closeMenu = () => setMenuOpen(false);
 
-  useEffect(() => {
-    (function (C, A, L) {
-      let p = function (a, ar) { a.q.push(ar); };
-      let d = C.document;
-      C.Cal = C.Cal || function () {
-        let cal = C.Cal;
-        let ar = arguments;
-        if (!cal.loaded) {
-          cal.ns = {};
-          cal.q = cal.q || [];
-          d.head.appendChild(d.createElement("script")).src = A;
-          cal.loaded = true;
-        }
-        if (ar[0] === L) {
-          const api = function () { p(api, arguments); };
-          const namespace = ar[1];
-          api.q = api.q || [];
-          if (typeof namespace === "string") {
-            cal.ns[namespace] = cal.ns[namespace] || api;
-            p(cal.ns[namespace], ar);
-            p(cal, ["initNamespace", namespace]);
-          } else {
-            p(cal, ar);
-          }
-          return;
-        }
-        p(cal, ar);
-      };
-    })(window, "https://app.cal.com/embed/embed.js", "init");
-
-    window.Cal("init", "kedros", { origin: "https://cal.com" });
-    window.Cal.ns.kedros("inline", {
-      elementOrSelector: "#cal-inline",
-      config: { layout: "month_view" },
-      calLink: CAL_LINK
-    });
-    window.Cal.ns.kedros("ui", {
-      hideEventTypeDetails: false,
-      layout: "month_view",
-      styles: { branding: { brandColor: "#642dd4" } }
-    });
-  }, []);
-
   return (
     <div className="site-shell" id="top">
       <header className="site-header">
@@ -187,7 +144,7 @@ export default function Home() {
             <a href="#contact" onClick={closeMenu}>Contact</a>
             <Link href="/login" onClick={closeMenu}>Client login</Link>
           </nav>
-          <a className="nav-cta" href="#contact">Start a project <ArrowUpRight size={16} /></a>
+          <a className="nav-cta" href={BOOKING_URL} target="_blank" rel="noopener noreferrer">Start a project <ArrowUpRight size={16} /></a>
           <button
             className="menu-toggle"
             type="button"
@@ -211,7 +168,7 @@ export default function Home() {
                 We build custom software that removes repetitive work, connects your business, and gives your team room to do more.
               </p>
               <div className="hero-actions">
-                <a className="button button-primary" href="#contact">Start a project <ArrowUpRight size={17} /></a>
+                <a className="button button-primary" href={BOOKING_URL} target="_blank" rel="noopener noreferrer">Start a project <ArrowUpRight size={17} /></a>
                 <a className="text-link" href="#services">Explore our services <ChevronRight size={16} /></a>
               </div>
               <div className="hero-note">
@@ -270,7 +227,7 @@ export default function Home() {
                   <h3>{title}</h3>
                   <p>{description}</p>
                   <p className="service-detail">{detail}</p>
-                  <a href="#contact" className="card-link" aria-label={`Learn more about ${title}`}>Discuss your needs <ArrowUpRight size={16} /></a>
+                  <a href={BOOKING_URL} target="_blank" rel="noopener noreferrer" className="card-link" aria-label={`Discuss ${title}`}>Discuss your needs <ArrowUpRight size={16} /></a>
                 </article>
               ))}
             </div>
@@ -305,7 +262,7 @@ export default function Home() {
               <p className="eyebrow">Why Kedros</p>
               <h2>More done.<br /><span>Less repeated.</span></h2>
               <p>Good software should move your business forward — not make you change the way you work to fit it.</p>
-              <a href="#contact" className="text-link text-link-light">Let&apos;s talk <ArrowUpRight size={16} /></a>
+              <a href={BOOKING_URL} target="_blank" rel="noopener noreferrer" className="text-link text-link-light">Let&apos;s talk <ArrowUpRight size={16} /></a>
             </div>
             <div className="principles-list">
               {principles.map((principle, index) => (
@@ -336,7 +293,7 @@ export default function Home() {
                   <div className="project-meta"><span>{industry.category}</span><span>0{index + 1}</span></div>
                   <h3>{industry.title}</h3>
                   <p>{industry.description}</p>
-                  <a href="#contact" className="project-link">Explore the fit <ArrowUpRight size={16} /></a>
+                  <a href={BOOKING_URL} target="_blank" rel="noopener noreferrer" className="project-link">Explore the fit <ArrowUpRight size={16} /></a>
                 </article>
               ))}
             </div>
@@ -344,14 +301,13 @@ export default function Home() {
         </section>
 
         <section className="contact-section section-pad" id="contact">
-          <div className="container contact-grid">
-            <div className="contact-intro">
-              <p className="eyebrow">Start a conversation</p>
-              <h2>Have a good<br /><span>idea?</span> Let&apos;s talk.</h2>
-              <p>Book a free 30-minute call and tell us a little about what you&apos;re building. We&apos;ll send a Zoom link straight to your inbox.</p>
-              <p className="form-note">No sales pitch. Just a useful first conversation.</p>
-            </div>
-            <div className="cal-embed" id="cal-inline" aria-label="Book a 30-minute call" />
+          <div className="container contact-cta">
+            <p className="eyebrow">Start a conversation</p>
+            <h2>Have a good <span>idea?</span> Let&apos;s talk.</h2>
+            <p>Book a free 30-minute call on Zoom and tell us a little about what you&apos;re building. No sales pitch — just a useful first conversation.</p>
+            <a className="button button-primary" href={BOOKING_URL} target="_blank" rel="noopener noreferrer">
+              Book a 30-minute call <ArrowUpRight size={17} />
+            </a>
           </div>
         </section>
       </main>
@@ -360,7 +316,7 @@ export default function Home() {
         <div className="container footer-top">
           <Logo light />
           <p>Custom software for the<br />way your business works.</p>
-          <a className="footer-cta" href="#contact">Start a project <ArrowUpRight size={16} /></a>
+          <a className="footer-cta" href={BOOKING_URL} target="_blank" rel="noopener noreferrer">Start a project <ArrowUpRight size={16} /></a>
         </div>
         <div className="container footer-bottom">
           <span>© {new Date().getFullYear()} Kedros. All rights reserved.</span>
