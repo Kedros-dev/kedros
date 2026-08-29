@@ -1,4 +1,7 @@
-import React, { useState } from "react";
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
 import {
   ArrowUpRight,
   BrainCircuit,
@@ -123,7 +126,7 @@ function SectionLabel({ eyebrow, title, copy, light = false }) {
   );
 }
 
-function App() {
+export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [sent, setSent] = useState(false);
 
@@ -144,6 +147,7 @@ function App() {
             <a href="#about" onClick={closeMenu}>Why Kedros</a>
             <a href="#work" onClick={closeMenu}>Our work</a>
             <a href="#contact" onClick={closeMenu}>Contact</a>
+            <Link href="/login" onClick={closeMenu}>Client login</Link>
           </nav>
           <a className="nav-cta" href="#contact">Start a project <ArrowUpRight size={16} /></a>
           <button
@@ -353,5 +357,3 @@ function App() {
     </div>
   );
 }
-
-export default App;

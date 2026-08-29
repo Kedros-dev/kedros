@@ -225,6 +225,39 @@ h1 em { color: #642dd4; font-style: normal; }
   .contact-grid { gap: 60px; }
 }
 
+.auth-shell { align-items: center; background: #f8fafb; display: flex; min-height: 100vh; }
+.auth-wrap { display: flex; flex-direction: column; gap: 36px; max-width: 420px; padding: 60px 0; width: 100%; }
+.auth-form { padding: 36px; }
+.auth-title { color: #0f134e; font-family: "Manrope"; font-size: 26px; font-weight: 700; letter-spacing: -.03em; margin-bottom: 8px; }
+.auth-subtitle { color: #656989; font-size: 13px; margin-bottom: 28px; }
+.auth-error { background: rgba(220,38,38,.08); border-radius: 6px; color: #b91c1c; font-size: 12px; margin: -10px 0 22px; padding: 10px 12px; }
+.auth-note { color: #656989; font-size: 12px; margin-top: 6px; }
+
+.dash-shell { background: #f8fafb; min-height: 100vh; padding: 60px 0 100px; }
+.dash-header { align-items: center; display: flex; justify-content: space-between; margin-bottom: 46px; }
+.dash-header h1 { color: #0f134e; font-family: "Manrope"; font-size: 28px; font-weight: 700; letter-spacing: -.03em; }
+.dash-signout { background: none; border: 1px solid #cad4e1; border-radius: 6px; color: #656989; cursor: pointer; font-size: 12px; font-weight: 600; padding: 9px 16px; }
+.dash-signout:hover { border-color: #642dd4; color: #642dd4; }
+.dash-cards { display: grid; gap: 20px; grid-template-columns: repeat(2, 1fr); margin-bottom: 40px; }
+.dash-card { background: #fff; box-shadow: 0 20px 60px rgba(15,19,78,.06); padding: 28px; }
+.dash-card h3 { color: #0f134e; font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+.dash-card .dash-amount { color: #0f134e; font-family: "Manrope"; font-size: 30px; font-weight: 700; letter-spacing: -.02em; margin: 10px 0 16px; }
+.dash-status { border-radius: 20px; display: inline-block; font-family: "DM Mono"; font-size: 10px; letter-spacing: .05em; padding: 5px 12px; text-transform: uppercase; }
+.dash-status-paid, .dash-status-active { background: rgba(34,197,94,.12); color: #15803d; }
+.dash-status-unpaid, .dash-status-none { background: rgba(100,45,212,.08); color: #642dd4; }
+.dash-status-past_due { background: rgba(234,179,8,.14); color: #a16207; }
+.dash-status-canceled { background: rgba(220,38,38,.1); color: #b91c1c; }
+.dash-form { background: #fff; box-shadow: 0 20px 60px rgba(15,19,78,.06); max-width: 480px; padding: 32px; }
+.dash-form h2 { color: #0f134e; font-size: 18px; font-weight: 700; margin-bottom: 20px; }
+.dash-form label { color: #0f134e; display: block; font-family: "Manrope"; font-size: 11px; font-weight: 700; margin-bottom: 20px; }
+.dash-form input, .dash-form select { background: transparent; border: 0; border-bottom: 1px solid #cad4e1; color: #0f134e; display: block; font-family: "Inter"; font-size: 13px; margin-top: 9px; outline: 0; padding: 10px 0; width: 100%; }
+.dash-form input:focus, .dash-form select:focus { border-color: #642dd4; }
+.dash-table { background: #fff; box-shadow: 0 20px 60px rgba(15,19,78,.06); margin-top: 34px; width: 100%; }
+.dash-table table { border-collapse: collapse; width: 100%; }
+.dash-table th { border-bottom: 1px solid #cad4e1; color: #656989; font-family: "DM Mono"; font-size: 10px; letter-spacing: .05em; padding: 14px 20px; text-align: left; text-transform: uppercase; }
+.dash-table td { border-bottom: 1px solid #f0f1f5; color: #0f134e; font-size: 13px; padding: 14px 20px; }
+.dash-credentials { background: rgba(100,45,212,.06); border-radius: 6px; font-family: "DM Mono"; font-size: 12px; margin-top: 18px; padding: 14px 16px; }
+
 @media (max-width: 620px) {
   .container { width: calc(100% - 40px); }
   .site-header { height: 72px; }
