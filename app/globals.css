@@ -179,6 +179,9 @@ h1 em { color: #642dd4; font-style: normal; }
 .contact-email a { align-items: center; color: #0f134e; display: inline-flex; font-family: "Manrope"; font-size: 15px; font-weight: 700; gap: 8px; }
 .contact-email a svg { color: #642dd4; }
 .contact-form { background: #fff; box-shadow: 0 20px 60px rgba(15,19,78,.07); padding: 40px; }
+.contact-intro .form-note { margin-top: 22px; text-align: left; }
+.cal-embed { background: #fff; box-shadow: 0 20px 60px rgba(15,19,78,.07); min-height: 580px; overflow: hidden; padding: 10px; }
+.cal-embed iframe { border: 0; height: 100%; width: 100% !important; }
 .contact-form label { color: #0f134e; display: block; font-family: "Manrope"; font-size: 11px; font-weight: 700; margin-bottom: 25px; }
 .contact-form input, .contact-form textarea { background: transparent; border: 0; border-bottom: 1px solid #cad4e1; border-radius: 0; color: #0f134e; display: block; font-family: "Inter"; font-size: 13px; margin-top: 11px; outline: 0; padding: 12px 0; resize: vertical; width: 100%; }
 .contact-form input:focus, .contact-form textarea:focus { border-color: #642dd4; }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowUpRight,
@@ -12,11 +12,12 @@ import {
   Instagram,
   Linkedin,
   Menu,
-  Send,
   Sparkles,
   Workflow,
   X
 } from "lucide-react";
+
+const CAL_LINK = "jasongreich/demo";
 
 const services = [
   {
@@ -128,14 +129,51 @@ function SectionLabel({ eyebrow, title, copy, light = false }) {
 
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [sent, setSent] = useState(false);
 
   const closeMenu = () => setMenuOpen(false);
 
-  const handleSubmit = (event) => {
-    event.preventDefault();
-    setSent(true);
-  };
+  useEffect(() => {
+    (function (C, A, L) {
+      let p = function (a, ar) { a.q.push(ar); };
+      let d = C.document;
+      C.Cal = C.Cal || function () {
+        let cal = C.Cal;
+        let ar = arguments;
+        if (!cal.loaded) {
+          cal.ns = {};
+          cal.q = cal.q || [];
+          d.head.appendChild(d.createElement("script")).src = A;
+          cal.loaded = true;
+        }
+        if (ar[0] === L) {
+          const api = function () { p(api, arguments); };
+          const namespace = ar[1];
+          api.q = api.q || [];
+          if (typeof namespace === "string") {
+            cal.ns[namespace] = cal.ns[namespace] || api;
+            p(cal.ns[namespace], ar);
+            p(cal, ["initNamespace", namespace]);
+          } else {
+            p(cal, ar);
+          }
+          return;
+        }
+        p(cal, ar);
+      };
+    })(window, "https://app.cal.com/embed/embed.js", "init");
+
+    window.Cal("init", "kedros", { origin: "https://cal.com" });
+    window.Cal.ns.kedros("inline", {
+      elementOrSelector: "#cal-inline",
+      config: { layout: "month_view" },
+      calLink: CAL_LINK
+    });
+    window.Cal.ns.kedros("ui", {
+      hideEventTypeDetails: false,
+      layout: "month_view",
+      styles: { branding: { brandColor: "#642dd4" } }
+    });
+  }, []);
 
   return (
     <div className="site-shell" id="top">
@@ -310,31 +348,10 @@ export default function Home() {
             <div className="contact-intro">
               <p className="eyebrow">Start a conversation</p>
               <h2>Have a good<br /><span>idea?</span> Let&apos;s talk.</h2>
-              <p>Tell us a little about what you&apos;re building, and we&apos;ll get back to you within two business days.</p>
-              <a href="#contact-form" className="text-link contact-call-link">Book a call <ArrowUpRight size={16} /></a>
-              <div className="contact-email">
-                <span>Prefer email?</span>
-                <a href="mailto:info@kedros.dev">info@kedros.dev <ArrowUpRight size={15} /></a>
-              </div>
+              <p>Book a free 30-minute call and tell us a little about what you&apos;re building. We&apos;ll send a Zoom link straight to your inbox.</p>
+              <p className="form-note">No sales pitch. Just a useful first conversation.</p>
             </div>
-            <form className="contact-form" id="contact-form" onSubmit={handleSubmit}>
-              {sent ? (
-                <div className="form-success">
-                  <span className="success-icon"><Check size={22} /></span>
-                  <h3>Thanks for reaching out.</h3>
-                  <p>This is a frontend preview for now. Your message hasn&apos;t been sent, but the form is ready to connect when you are.</p>
-                  <button type="button" className="text-link" onClick={() => setSent(false)}>Send another message <ArrowUpRight size={16} /></button>
-                </div>
-              ) : (
-                <>
-                  <label>Name<input type="text" name="name" placeholder="Your name" required /></label>
-                  <label>Email<input type="email" name="email" placeholder="you@company.com" required /></label>
-                  <label>How can we help?<textarea name="message" placeholder="Tell us a little about your project..." rows="4" required /></label>
-                  <button className="button button-primary form-submit" type="submit">Send enquiry <Send size={16} /></button>
-                  <p className="form-note">No sales pitch. Just a useful first conversation.</p>
-                </>
-              )}
-            </form>
+            <div className="cal-embed" id="cal-inline" aria-label="Book a 30-minute call" />
           </div>
         </section>
       </main>
