@@ -33,7 +33,12 @@ export async function POST(request) {
           .catch(() => {});
       }
 
-      if (session.metadata.type === "subscription" && session.subscription) {
+      if (session.metadata.type === "one_time") {
+        await prisma.user.update({
+          where: { id: userId },
+          data: { oneTimePaidAt: new Date() }
+        });
+      } else if (session.metadata.type === "subscription" && session.subscription) {
         await prisma.user.update({
           where: { id: userId },
           data: { subscriptionId: session.subscription, subscriptionStatus: "ACTIVE" }

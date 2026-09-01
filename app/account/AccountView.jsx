@@ -31,11 +31,11 @@ export default function AccountView({ user, invoices }) {
   const [loading, setLoading] = useState(null);
   const [error, setError] = useState("");
 
-  const startSubscription = async () => {
-    setLoading("subscription");
+  const startCheckout = async (kind) => {
+    setLoading(kind);
     setError("");
 
-    const res = await fetch("/api/checkout/subscription", { method: "POST" });
+    const res = await fetch(`/api/checkout/${kind}`, { method: "POST" });
     const data = await res.json();
 
     if (!res.ok) {
@@ -47,6 +47,7 @@ export default function AccountView({ user, invoices }) {
     window.location.href = data.url;
   };
 
+  const paid = Boolean(user.oneTimePaidAt);
   const subActive = user.subscriptionStatus === "ACTIVE";
 
   return (
@@ -67,11 +68,21 @@ export default function AccountView({ user, invoices }) {
 
         <div className="dash-cards">
           <div className="dash-card">
+            <h3>One-time setup fee</h3>
+            <span className={`dash-status dash-status-${paid ? "paid" : "unpaid"}`}>{paid ? "Paid" : "Unpaid"}</span>
+            <p className="dash-amount">{formatCents(user.oneTimeAmountCents)}</p>
+            {!paid && user.oneTimeAmountCents > 0 && (
+              <button className="button button-primary" onClick={() => startCheckout("one-time")} disabled={loading === "one-time"}>
+                {loading === "one-time" ? "Redirecting..." : "Pay setup fee"} <ArrowUpRight size={16} />
+              </button>
+            )}
+          </div>
+          <div className="dash-card">
             <h3>Monthly subscription</h3>
             <span className={`dash-status dash-status-${user.subscriptionStatus.toLowerCase()}`}>{user.subscriptionStatus}</span>
             <p className="dash-amount">{formatCents(user.monthlyAmountCents)}/mo</p>
             {!subActive && user.monthlyAmountCents > 0 && (
-              <button className="button button-primary" onClick={startSubscription} disabled={loading === "subscription"}>
+              <button className="button button-primary" onClick={() => startCheckout("subscription")} disabled={loading === "subscription"}>
                 {loading === "subscription" ? "Redirecting..." : "Subscribe monthly"} <ArrowUpRight size={16} />
               </button>
             )}

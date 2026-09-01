@@ -32,6 +32,8 @@ export default async function AccountPage() {
     <AccountView
       user={{
         name: user.name,
+        oneTimeAmountCents: user.oneTimeAmountCents,
+        oneTimePaidAt: user.oneTimePaidAt,
         monthlyAmountCents: user.monthlyAmountCents,
         subscriptionStatus: user.subscriptionStatus
       }}
