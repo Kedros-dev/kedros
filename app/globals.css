@@ -168,7 +168,7 @@ h1 em { color: #642dd4; font-style: normal; }
 
 .value-section { background: #0f134e; color: #fff; }
 .dark-section-divider { background: #0f134e; height: 166px; overflow: hidden; position: relative; width: 100%; }
-.dark-section-divider::before { background: #642dd4; clip-path: polygon(0 0, 100% 110px, 100% 100%, 0 calc(100% - 110px)); content: ""; inset: 0; position: absolute; }
+.dark-section-divider::before { background: #fff; clip-path: polygon(0 0, 100% 110px, 100% 100%, 0 calc(100% - 110px)); content: ""; inset: 0; position: absolute; }
 .value-grid { display: grid; gap: 13%; grid-template-columns: 1fr 1.1fr; }
 .value-intro .eyebrow { color: #cad4e1; }
 .value-intro h2 { font-size: clamp(38px, 4.2vw, 57px); font-weight: 600; letter-spacing: -.07em; line-height: 1.08; margin-bottom: 24px; }
