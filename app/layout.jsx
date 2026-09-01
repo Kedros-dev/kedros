@@ -2,7 +2,7 @@ import "./globals.css";
 import Providers from "./providers";
 
 export const metadata = {
-  title: "Kedros — Software built around your business",
+  title: "Kedros: Software built around your business",
   description: "Kedros builds custom software around the way your business actually works.",
   icons: {
     icon: "/assets/kedros-symbol.png"

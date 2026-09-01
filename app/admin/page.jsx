@@ -63,7 +63,7 @@ export default function AdminPage() {
         <div className="dash-header">
           <div>
             <BrandMark />
-            <h1 style={{ marginTop: 18 }}>Admin — Clients</h1>
+            <h1 style={{ marginTop: 18 }}>Admin: Clients</h1>
           </div>
           <button className="dash-signout" onClick={() => signOut({ callbackUrl: "/" })}>Sign out</button>
         </div>
@@ -72,7 +72,7 @@ export default function AdminPage() {
           <h2>Add a client</h2>
           <label>Name<input required value={form.name} onChange={handleChange("name")} placeholder="Client business name" /></label>
           <label>Email<input required type="email" value={form.email} onChange={handleChange("email")} placeholder="client@company.com" /></label>
-          <label>Setup fee — first invoice (USD)<input required type="number" min="0" step="0.01" value={form.oneTimeAmountDollars} onChange={handleChange("oneTimeAmountDollars")} placeholder="2500" /></label>
+          <label>Setup fee, first invoice (USD)<input required type="number" min="0" step="0.01" value={form.oneTimeAmountDollars} onChange={handleChange("oneTimeAmountDollars")} placeholder="2500" /></label>
           <label>Monthly subscription (USD)<input required type="number" min="0" step="0.01" value={form.monthlyAmountDollars} onChange={handleChange("monthlyAmountDollars")} placeholder="150" /></label>
 
           {error && <p className="auth-error">{error}</p>}
@@ -188,7 +188,7 @@ function ClientRow({ client, open, onToggle, onChanged }) {
     });
     if (data) {
       setMsg(
-        `Invoice ${data.invoice.number || ""} created — it's on the client's account page.` +
+        `Invoice ${data.invoice.number || ""} created. It's on the client's account page.` +
           (data.invoice.emailed ? " Emailed to the client." : "")
       );
       setBill({ amountDollars: "", description: "" });
@@ -245,7 +245,7 @@ function ClientRow({ client, open, onToggle, onChanged }) {
                     disabled={Boolean(client.oneTimePaidAt)}
                   />
                   {client.oneTimePaidAt && (
-                    <span style={{ color: "#656989", fontSize: 11 }}>Paid — locked</span>
+                    <span style={{ color: "#656989", fontSize: 11 }}>Paid, locked</span>
                   )}
                 </label>
                 <label>Monthly (USD)<input type="number" min="0" step="0.01" value={edit.monthlyAmountDollars} onChange={editField("monthlyAmountDollars")} /></label>

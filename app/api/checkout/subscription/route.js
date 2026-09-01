@@ -34,7 +34,7 @@ export async function POST(request) {
           unit_amount: user.monthlyAmountCents,
           recurring: { interval: "month" },
           product_data: {
-            name: `Kedros — Monthly subscription (${user.name})`
+            name: `Kedros: Monthly subscription (${user.name})`
           }
         },
         quantity: 1
