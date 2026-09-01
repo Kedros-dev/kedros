@@ -254,7 +254,7 @@ h1 em { color: #642dd4; font-style: normal; }
 .form-success p { color: #656989; font-size: 13px; line-height: 1.7; max-width: 360px; }
 .form-success .text-link { background: none; border: 0; cursor: pointer; padding: 0; }
 
-.site-footer { background: #13011b; color: #fff; padding: 60px 0 25px; }
+.site-footer { background: #0f134e; color: #fff; padding: 60px 0 25px; }
 .footer-logo-filter { height: 0; overflow: hidden; position: absolute; width: 0; }
 .footer-wordmark .brand-wordmark-image { filter: url(#footer-logo-color); }
 .footer-wordmark .brand-wordmark-image { height: 38px; width: auto; }
