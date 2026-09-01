@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
+import BrandMark from "../BrandMark";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,6 +12,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("error") === "deactivated") {
+      setError("This account has been deactivated. Contact Kedros for help.");
+    }
+  }, []);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -27,7 +34,11 @@ export default function LoginPage() {
     setLoading(false);
 
     if (result?.error) {
-      setError("Incorrect email or password.");
+      setError(
+        /deactiv/i.test(result.error)
+          ? "This account has been deactivated. Contact Kedros for help."
+          : "Incorrect email or password."
+      );
       return;
     }
 
@@ -38,13 +49,7 @@ export default function LoginPage() {
   return (
     <div className="site-shell auth-shell">
       <div className="container auth-wrap">
-        <Link href="/" className="brand-mark" aria-label="Kedros home">
-          <span className="brand-symbol" aria-hidden="true">
-            <span className="brand-arrow" />
-            <span className="brand-b" />
-          </span>
-          <span className="brand-word">KEDR<span>O</span>S</span>
-        </Link>
+        <BrandMark />
 
         <form className="contact-form auth-form" onSubmit={handleSubmit}>
           <h1 className="auth-title">Client login</h1>
