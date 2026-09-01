@@ -12,7 +12,6 @@ import {
   Instagram,
   Linkedin,
   Menu,
-  Send,
   Workflow,
   X
 } from "lucide-react";
@@ -159,15 +158,8 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [expandedService, setExpandedService] = useState(null);
   const [expandedProcess, setExpandedProcess] = useState(null);
-  const [formNotice, setFormNotice] = useState(false);
 
   const closeMenu = () => setMenuOpen(false);
-
-  const handleSubmit = (event) => {
-    event.preventDefault();
-    // TODO: Connect this form to the agreed enquiry endpoint or CRM when backend work is in scope.
-    setFormNotice(true);
-  };
   return (
     <div className="site-shell" id="top">
       <header className="site-header">
@@ -374,25 +366,13 @@ export default function Home() {
         </section>
 
         <section className="contact-section section-pad" id="contact">
-          <div className="container contact-grid">
-            <div className="contact-intro">
-              <p className="eyebrow">Start a conversation</p>
-              <h2>Have a good<br /><span>idea?</span> Let&apos;s talk.</h2>
-              <p>Tell us a little about what you&apos;re building. We&apos;ll use it to make the first conversation useful.</p>
-              <a href="#contact-form" className="text-link contact-call-link">Book a call <ArrowUpRight size={16} /></a>
-              <div className="contact-email">
-                <span>Prefer email?</span>
-                <a href="mailto:info@kedros.dev">info@kedros.dev <ArrowUpRight size={15} /></a>
-              </div>
-            </div>
-            <form className="contact-form" id="contact-form" onSubmit={handleSubmit}>
-              <label>Name<input type="text" name="name" placeholder="Your name" required /></label>
-              <label>Email<input type="email" name="email" placeholder="you@company.com" required /></label>
-              <label>How can we help?<textarea name="message" placeholder="Tell us a little about your project..." rows="4" required /></label>
-              <button className="button button-primary form-submit" type="submit">Send enquiry <Send size={16} /></button>
-              <p className="form-note">No sales pitch. Just a useful first conversation.</p>
-              {formNotice && <p className="form-integration-note" role="status">Enquiry sending will be connected when the contact workflow is ready.</p>}
-            </form>
+          <div className="container contact-cta">
+            <p className="eyebrow">Start a conversation</p>
+            <h2>Have a good <span>idea?</span> Let&apos;s talk.</h2>
+            <p>Book a free 30-minute call on Zoom and tell us a little about what you&apos;re building. No sales pitch — just a useful first conversation.</p>
+            <a className="button button-primary" href={BOOKING_URL} target="_blank" rel="noopener noreferrer">
+              Book a 30-minute call <ArrowUpRight size={17} />
+            </a>
           </div>
         </section>
       </main>
