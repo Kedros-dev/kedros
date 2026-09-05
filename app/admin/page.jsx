@@ -3,15 +3,63 @@
 import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
 import BrandMark from "../BrandMark";
+import { BROUGHT_BY_OPTIONS, PARTNERS, computeSplitCents, isValidCombination } from "@/lib/partnerSplit";
 
 function formatCents(cents) {
   return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
 }
 
+// Dropdown options for "brought by", excluding Christiane when supervising isn't required
+// (that combination has no defined split — see lib/partnerSplit.js).
+function broughtByOptions(supervisingRequired) {
+  return BROUGHT_BY_OPTIONS.filter((option) => supervisingRequired || option.value !== "CHRISTIANE");
+}
+
+function SplitPreview({ amountCents, broughtBy, supervisingRequired }) {
+  const split = computeSplitCents(amountCents, broughtBy, supervisingRequired);
+  if (!split) return null;
+  return (
+    <p style={{ color: "#656989", fontSize: 12, margin: 0 }}>
+      Split: {PARTNERS.map((partner) => `${partner} ${formatCents(split[partner])}`).join(" · ")}
+    </p>
+  );
+}
+
+function PartnerTotals({ clients }) {
+  const totals = { Jason: 0, Jad: 0, Christiane: 0 };
+  for (const client of clients) {
+    if (client.subscriptionStatus !== "ACTIVE") continue;
+    const split = computeSplitCents(client.monthlyAmountCents, client.broughtBy, client.supervisingRequired);
+    if (!split) continue;
+    for (const partner of PARTNERS) totals[partner] += split[partner];
+  }
+
+  return (
+    <div className="dash-form" style={{ display: "grid", gap: 8 }}>
+      <h2>Partner payouts (active monthly subscriptions)</h2>
+      <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+        {PARTNERS.map((partner) => (
+          <div key={partner}>
+            <div style={{ color: "#656989", fontSize: 12 }}>{partner}</div>
+            <div style={{ fontSize: 20, fontWeight: 600 }}>{formatCents(totals[partner])}/mo</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ name: "", email: "", oneTimeAmountDollars: "", monthlyAmountDollars: "" });
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    oneTimeAmountDollars: "",
+    monthlyAmountDollars: "",
+    broughtBy: "JASON",
+    supervisingRequired: true
+  });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [created, setCreated] = useState(null);
@@ -53,7 +101,7 @@ export default function AdminPage() {
     }
 
     setCreated({ email: data.client.email, tempPassword: data.tempPassword });
-    setForm({ name: "", email: "", oneTimeAmountDollars: "", monthlyAmountDollars: "" });
+    setForm({ name: "", email: "", oneTimeAmountDollars: "", monthlyAmountDollars: "", broughtBy: "JASON", supervisingRequired: true });
     loadClients();
   };
 
@@ -68,12 +116,43 @@ export default function AdminPage() {
           <button className="dash-signout" onClick={() => signOut({ callbackUrl: "/" })}>Sign out</button>
         </div>
 
+        <PartnerTotals clients={clients} />
+
         <form className="dash-form" onSubmit={handleSubmit}>
           <h2>Add a client</h2>
           <label>Name<input required value={form.name} onChange={handleChange("name")} placeholder="Client business name" /></label>
           <label>Email<input required type="email" value={form.email} onChange={handleChange("email")} placeholder="client@company.com" /></label>
           <label>Setup fee, first invoice (USD)<input required type="number" min="0" step="0.01" value={form.oneTimeAmountDollars} onChange={handleChange("oneTimeAmountDollars")} placeholder="2500" /></label>
           <label>Monthly subscription (USD)<input required type="number" min="0" step="0.01" value={form.monthlyAmountDollars} onChange={handleChange("monthlyAmountDollars")} placeholder="150" /></label>
+          <label>Brought by
+            <select value={form.broughtBy} onChange={handleChange("broughtBy")}>
+              {broughtByOptions(form.supervisingRequired).map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={form.supervisingRequired}
+              onChange={(e) => {
+                const supervisingRequired = e.target.checked;
+                setForm((prev) => ({
+                  ...prev,
+                  supervisingRequired,
+                  broughtBy: !supervisingRequired && prev.broughtBy === "CHRISTIANE" ? "JASON" : prev.broughtBy
+                }));
+              }}
+            />
+            Supervising required
+          </label>
+          {form.monthlyAmountDollars && isValidCombination(form.broughtBy, form.supervisingRequired) && (
+            <SplitPreview
+              amountCents={Math.round(Number(form.monthlyAmountDollars) * 100)}
+              broughtBy={form.broughtBy}
+              supervisingRequired={form.supervisingRequired}
+            />
+          )}
 
           {error && <p className="auth-error">{error}</p>}
 
@@ -127,7 +206,9 @@ function ClientRow({ client, open, onToggle, onChanged }) {
     name: client.name,
     email: client.email,
     oneTimeAmountDollars: (client.oneTimeAmountCents / 100).toString(),
-    monthlyAmountDollars: (client.monthlyAmountCents / 100).toString()
+    monthlyAmountDollars: (client.monthlyAmountCents / 100).toString(),
+    broughtBy: client.broughtBy,
+    supervisingRequired: client.supervisingRequired
   });
   const [bill, setBill] = useState({ amountDollars: "", description: "" });
   const [busy, setBusy] = useState("");
@@ -219,7 +300,15 @@ function ClientRow({ client, open, onToggle, onChanged }) {
       <tr>
         <td>{client.name}<br /><span style={{ color: "#656989", fontSize: 11 }}>{client.email}</span></td>
         <td>{formatCents(client.oneTimeAmountCents)}{client.oneTimePaidAt && <span style={{ color: "#1f7a3d", fontSize: 11 }}><br />paid</span>}</td>
-        <td>{formatCents(client.monthlyAmountCents)}/mo</td>
+        <td>
+          {formatCents(client.monthlyAmountCents)}/mo
+          <br />
+          <SplitPreview
+            amountCents={client.monthlyAmountCents}
+            broughtBy={client.broughtBy}
+            supervisingRequired={client.supervisingRequired}
+          />
+        </td>
         <td><span className={`dash-status dash-status-${client.subscriptionStatus.toLowerCase()}`}>{client.subscriptionStatus}</span></td>
         <td><span className={`dash-status dash-status-${client.isActive ? "paid" : "unpaid"}`}>{client.isActive ? "Active" : "Deactivated"}</span></td>
         <td><button className="dash-signout" onClick={onToggle}>{open ? "Close" : "Manage"}</button></td>
@@ -249,6 +338,38 @@ function ClientRow({ client, open, onToggle, onChanged }) {
                   )}
                 </label>
                 <label>Monthly (USD)<input type="number" min="0" step="0.01" value={edit.monthlyAmountDollars} onChange={editField("monthlyAmountDollars")} /></label>
+                <label>Brought by
+                  <select
+                    value={edit.broughtBy}
+                    onChange={(e) => setEdit((p) => ({ ...p, broughtBy: e.target.value }))}
+                  >
+                    {broughtByOptions(edit.supervisingRequired).map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={edit.supervisingRequired}
+                    onChange={(e) => {
+                      const supervisingRequired = e.target.checked;
+                      setEdit((prev) => ({
+                        ...prev,
+                        supervisingRequired,
+                        broughtBy: !supervisingRequired && prev.broughtBy === "CHRISTIANE" ? "JASON" : prev.broughtBy
+                      }));
+                    }}
+                  />
+                  Supervising required
+                </label>
+                {edit.monthlyAmountDollars && isValidCombination(edit.broughtBy, edit.supervisingRequired) && (
+                  <SplitPreview
+                    amountCents={Math.round(Number(edit.monthlyAmountDollars) * 100)}
+                    broughtBy={edit.broughtBy}
+                    supervisingRequired={edit.supervisingRequired}
+                  />
+                )}
                 <button className="button button-primary" onClick={saveEdit} disabled={busy === "edit"}>{busy === "edit" ? "Saving..." : "Save details"}</button>
               </div>
 

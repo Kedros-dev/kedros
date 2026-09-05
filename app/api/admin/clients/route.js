@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { stripe, createAndSendInvoice } from "@/lib/stripe";
+import { isValidCombination } from "@/lib/partnerSplit";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,8 @@ export async function GET() {
       email: true,
       oneTimeAmountCents: true,
       monthlyAmountCents: true,
+      broughtBy: true,
+      supervisingRequired: true,
       oneTimePaidAt: true,
       subscriptionStatus: true,
       subscriptionId: true,
@@ -44,6 +47,8 @@ export async function POST(request) {
 
   const body = await request.json();
   const { name, email, oneTimeAmountDollars, monthlyAmountDollars } = body;
+  const broughtBy = body.broughtBy || "JASON";
+  const supervisingRequired = body.supervisingRequired !== false;
 
   if (!name || !email) {
     return NextResponse.json({ error: "Name and email are required." }, { status: 400 });
@@ -54,6 +59,10 @@ export async function POST(request) {
 
   if (oneTimeAmountCents < 0 || monthlyAmountCents < 0) {
     return NextResponse.json({ error: "Amounts must be positive." }, { status: 400 });
+  }
+
+  if (!isValidCombination(broughtBy, supervisingRequired)) {
+    return NextResponse.json({ error: "That brought-by / supervising combination has no defined split." }, { status: 400 });
   }
 
   const normalizedEmail = String(email).toLowerCase().trim();
@@ -79,6 +88,8 @@ export async function POST(request) {
       role: "CLIENT",
       oneTimeAmountCents,
       monthlyAmountCents,
+      broughtBy,
+      supervisingRequired,
       stripeCustomerId: customer.id,
       mustChangePassword: true
     }
