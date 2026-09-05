@@ -3,45 +3,62 @@
 import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
 import BrandMark from "../BrandMark";
-import { BROUGHT_BY_OPTIONS, PARTNERS, computeSplitCents, isValidCombination } from "@/lib/partnerSplit";
+import { resolveSplitPercentages, computeSplitCents, sumPercentages } from "@/lib/partnerSplit";
 
 function formatCents(cents) {
   return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
 }
 
-// Dropdown options for "brought by", excluding Christiane when supervising isn't required
-// (that combination has no defined split — see lib/partnerSplit.js).
-function broughtByOptions(supervisingRequired) {
-  return BROUGHT_BY_OPTIONS.filter((option) => supervisingRequired || option.value !== "CHRISTIANE");
+function partnerName(partners, partnerId) {
+  const partner = partners.find((p) => p.id === partnerId);
+  return partner ? partner.name : "Unknown";
 }
 
-function SplitPreview({ amountCents, broughtBy, supervisingRequired }) {
-  const split = computeSplitCents(amountCents, broughtBy, supervisingRequired);
-  if (!split) return null;
+// Brought-by dropdown options: every active partner, plus "Referral" (no partner) as "".
+function sourceOptions(partners) {
+  return [{ value: "", label: "Referral" }, ...partners.filter((p) => p.active).map((p) => ({ value: p.id, label: p.name }))];
+}
+
+function SplitPreview({ amountCents, source, partners, rules }) {
+  const percentages = resolveSplitPercentages(source, rules);
+  if (!percentages) {
+    return <p style={{ color: "#b3261e", fontSize: 12, margin: 0 }}>No split rule defined for this combination yet — set one below or use an override.</p>;
+  }
+  const split = computeSplitCents(amountCents, percentages);
+  const total = sumPercentages(percentages);
   return (
     <p style={{ color: "#656989", fontSize: 12, margin: 0 }}>
-      Split: {PARTNERS.map((partner) => `${partner} ${formatCents(split[partner])}`).join(" · ")}
+      Split: {Object.entries(split).map(([partnerId, cents]) => `${partnerName(partners, partnerId)} ${formatCents(cents)}`).join(" · ")}
+      {total !== 100 && <span style={{ color: "#b3261e" }}> (percentages add up to {total}%)</span>}
     </p>
   );
 }
 
-function PartnerTotals({ clients }) {
-  const totals = { Jason: 0, Jad: 0, Christiane: 0 };
+function PartnerTotals({ clients, partners, rules }) {
+  const totals = {};
+  for (const partner of partners) totals[partner.id] = 0;
+
   for (const client of clients) {
     if (client.subscriptionStatus !== "ACTIVE") continue;
-    const split = computeSplitCents(client.monthlyAmountCents, client.broughtBy, client.supervisingRequired);
-    if (!split) continue;
-    for (const partner of PARTNERS) totals[partner] += split[partner];
+    const percentages = resolveSplitPercentages(client, rules);
+    if (!percentages) continue;
+    const split = computeSplitCents(client.monthlyAmountCents, percentages);
+    for (const [partnerId, cents] of Object.entries(split)) {
+      totals[partnerId] = (totals[partnerId] || 0) + cents;
+    }
   }
+
+  const partnerIds = partners.filter((p) => p.active || totals[p.id] > 0).map((p) => p.id);
+  if (partnerIds.length === 0) return null;
 
   return (
     <div className="dash-form" style={{ display: "grid", gap: 8 }}>
       <h2>Partner payouts (active monthly subscriptions)</h2>
       <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-        {PARTNERS.map((partner) => (
-          <div key={partner}>
-            <div style={{ color: "#656989", fontSize: 12 }}>{partner}</div>
-            <div style={{ fontSize: 20, fontWeight: 600 }}>{formatCents(totals[partner])}/mo</div>
+        {partnerIds.map((partnerId) => (
+          <div key={partnerId}>
+            <div style={{ color: "#656989", fontSize: 12 }}>{partnerName(partners, partnerId)}</div>
+            <div style={{ fontSize: 20, fontWeight: 600 }}>{formatCents(totals[partnerId])}/mo</div>
           </div>
         ))}
       </div>
@@ -49,15 +66,201 @@ function PartnerTotals({ clients }) {
   );
 }
 
+function PartnersManager({ partners, onChanged }) {
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const addPartner = async (event) => {
+    event.preventDefault();
+    if (!name.trim()) return;
+    setBusy(true);
+    setErr("");
+    const res = await fetch("/api/admin/partners", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name.trim() })
+    });
+    const data = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) {
+      setErr(data.error || "Could not add partner.");
+      return;
+    }
+    setName("");
+    onChanged();
+  };
+
+  const toggleActive = async (partner) => {
+    await fetch(`/api/admin/partners/${partner.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active: !partner.active })
+    });
+    onChanged();
+  };
+
+  return (
+    <div className="dash-form" style={{ display: "grid", gap: 12 }}>
+      <h2>Partners</h2>
+      <div style={{ display: "grid", gap: 10 }}>
+        {partners.map((partner) => (
+          <div key={partner.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ flex: 1, fontSize: 13, color: "#0f134e" }}>{partner.name}</span>
+            <span className={`dash-status dash-status-${partner.active ? "paid" : "unpaid"}`}>{partner.active ? "Active" : "Inactive"}</span>
+            <button type="button" className="dash-signout" onClick={() => toggleActive(partner)}>
+              {partner.active ? "Deactivate" : "Reactivate"}
+            </button>
+          </div>
+        ))}
+        {partners.length === 0 && <p style={{ color: "#656989", fontSize: 13 }}>No partners yet.</p>}
+      </div>
+      <form onSubmit={addPartner} style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+        <label style={{ flex: 1, margin: 0 }}>Add partner<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Partner name" /></label>
+        <button className="button button-primary" type="submit" disabled={busy} style={{ whiteSpace: "nowrap" }}>{busy ? "Adding..." : "Add"}</button>
+      </form>
+      {err && <p className="auth-error">{err}</p>}
+      <p style={{ color: "#656989", fontSize: 12, margin: 0 }}>
+        Deactivating a partner removes them from new selections but keeps their historical splits intact. After adding a partner, set their default split percentages below.
+      </p>
+    </div>
+  );
+}
+
+function buildSplitRuleMatrix(rules) {
+  const matrix = { true: {}, false: {} };
+  for (const rule of rules) {
+    const supervisingKey = rule.supervisingRequired ? "true" : "false";
+    const sourceKey = rule.broughtByPartnerId || "REFERRAL";
+    matrix[supervisingKey][sourceKey] = { ruleId: rule.id, splits: { ...(rule.splits || {}) } };
+  }
+  return matrix;
+}
+
+const cellInputStyle = { width: 56, padding: "6px 4px", border: "1px solid #cad4e1", borderRadius: 4, fontSize: 13, textAlign: "center" };
+const matrixThStyle = { borderBottom: "1px solid #cad4e1", color: "#656989", fontFamily: "DM Mono", fontSize: 10, letterSpacing: ".05em", padding: "10px 12px", textAlign: "left", textTransform: "uppercase" };
+const matrixTdStyle = { borderBottom: "1px solid #f0f1f5", color: "#0f134e", fontSize: 13, padding: "8px 12px" };
+
+function SplitRulesEditor({ partners, rules, onSaved }) {
+  const activePartners = partners.filter((p) => p.active);
+  const sources = [{ key: "REFERRAL", label: "Referral" }, ...activePartners.map((p) => ({ key: p.id, label: p.name }))];
+
+  const [matrix, setMatrix] = useState(() => buildSplitRuleMatrix(rules));
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+
+  const setCell = (supervisingKey, sourceKey, partnerId, value) => {
+    setMatrix((prev) => {
+      const existing = prev[supervisingKey][sourceKey] || { ruleId: null, splits: {} };
+      const splits = { ...existing.splits };
+      if (value === "") delete splits[partnerId];
+      else splits[partnerId] = value;
+      return { ...prev, [supervisingKey]: { ...prev[supervisingKey], [sourceKey]: { ...existing, splits } } };
+    });
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setMsg("");
+    setErr("");
+
+    const payload = [];
+    for (const supervisingKey of ["true", "false"]) {
+      for (const source of sources) {
+        const cell = matrix[supervisingKey][source.key];
+        if (!cell) continue;
+        payload.push({
+          id: cell.ruleId,
+          broughtByPartnerId: source.key === "REFERRAL" ? null : source.key,
+          supervisingRequired: supervisingKey === "true",
+          splits: cell.splits
+        });
+      }
+    }
+
+    const res = await fetch("/api/admin/split-rules", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rules: payload })
+    });
+    setSaving(false);
+    if (!res.ok) {
+      setErr("Could not save split rules.");
+      return;
+    }
+    setMsg("Saved.");
+    onSaved();
+  };
+
+  const renderTable = (supervisingKey, title) => (
+    <div style={{ overflowX: "auto" }}>
+      <strong style={{ fontSize: 12, letterSpacing: 0.4, color: "#0f134e" }}>{title}</strong>
+      <table style={{ borderCollapse: "collapse", marginTop: 8 }}>
+        <thead>
+          <tr>
+            <th style={matrixThStyle}></th>
+            {sources.map((source) => <th key={source.key} style={matrixThStyle}>{source.label}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {activePartners.map((partner) => (
+            <tr key={partner.id}>
+              <td style={{ ...matrixTdStyle, fontWeight: 600 }}>{partner.name}</td>
+              {sources.map((source) => {
+                const cell = matrix[supervisingKey][source.key];
+                const value = cell?.splits?.[partner.id] ?? "";
+                return (
+                  <td key={source.key} style={matrixTdStyle}>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      style={cellInputStyle}
+                      value={value}
+                      onChange={(e) => setCell(supervisingKey, source.key, partner.id, e.target.value)}
+                    />
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  return (
+    <div style={{ background: "#fff", boxShadow: "0 20px 60px rgba(15,19,78,.06)", padding: 32, display: "grid", gap: 16 }}>
+      <h2 style={{ color: "#0f134e", fontSize: 18, fontWeight: 700, margin: 0 }}>Default split rules (%)</h2>
+      {activePartners.length === 0 && <p style={{ color: "#656989", fontSize: 13 }}>Add at least one partner above first.</p>}
+      {activePartners.length > 0 && (
+        <>
+          {renderTable("true", "Supervising required")}
+          {renderTable("false", "Supervising NOT required")}
+          {msg && <p style={{ color: "#1f7a3d", fontSize: 13 }}>{msg}</p>}
+          {err && <p className="auth-error">{err}</p>}
+          <button className="button button-primary" style={{ width: "fit-content" }} onClick={save} disabled={saving}>
+            {saving ? "Saving..." : "Save split rules"}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const [clients, setClients] = useState([]);
+  const [partners, setPartners] = useState([]);
+  const [rules, setRules] = useState([]);
+  const [rulesVersion, setRulesVersion] = useState(0);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
     name: "",
     email: "",
     oneTimeAmountDollars: "",
     monthlyAmountDollars: "",
-    broughtBy: "JASON",
+    broughtByPartnerId: "",
     supervisingRequired: true
   });
   const [submitting, setSubmitting] = useState(false);
@@ -73,8 +276,23 @@ export default function AdminPage() {
     setLoading(false);
   };
 
+  const loadPartners = async () => {
+    const res = await fetch("/api/admin/partners");
+    const data = await res.json();
+    setPartners(data.partners || []);
+  };
+
+  const loadRules = async () => {
+    const res = await fetch("/api/admin/split-rules");
+    const data = await res.json();
+    setRules(data.rules || []);
+    setRulesVersion((v) => v + 1);
+  };
+
   useEffect(() => {
     loadClients();
+    loadPartners();
+    loadRules();
   }, []);
 
   const handleChange = (field) => (event) => {
@@ -90,7 +308,7 @@ export default function AdminPage() {
     const res = await fetch("/api/admin/clients", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form)
+      body: JSON.stringify({ ...form, broughtByPartnerId: form.broughtByPartnerId || null })
     });
     const data = await res.json();
     setSubmitting(false);
@@ -101,7 +319,7 @@ export default function AdminPage() {
     }
 
     setCreated({ email: data.client.email, tempPassword: data.tempPassword });
-    setForm({ name: "", email: "", oneTimeAmountDollars: "", monthlyAmountDollars: "", broughtBy: "JASON", supervisingRequired: true });
+    setForm({ name: "", email: "", oneTimeAmountDollars: "", monthlyAmountDollars: "", broughtByPartnerId: "", supervisingRequired: true });
     loadClients();
   };
 
@@ -116,7 +334,11 @@ export default function AdminPage() {
           <button className="dash-signout" onClick={() => signOut({ callbackUrl: "/" })}>Sign out</button>
         </div>
 
-        <PartnerTotals clients={clients} />
+        <div style={{ display: "grid", gap: 24, marginBottom: 24 }}>
+          <PartnerTotals clients={clients} partners={partners} rules={rules} />
+          <PartnersManager partners={partners} onChanged={() => { loadPartners(); loadRules(); }} />
+          <SplitRulesEditor key={rulesVersion} partners={partners} rules={rules} onSaved={loadRules} />
+        </div>
 
         <form className="dash-form" onSubmit={handleSubmit}>
           <h2>Add a client</h2>
@@ -125,8 +347,8 @@ export default function AdminPage() {
           <label>Setup fee, first invoice (USD)<input required type="number" min="0" step="0.01" value={form.oneTimeAmountDollars} onChange={handleChange("oneTimeAmountDollars")} placeholder="2500" /></label>
           <label>Monthly subscription (USD)<input required type="number" min="0" step="0.01" value={form.monthlyAmountDollars} onChange={handleChange("monthlyAmountDollars")} placeholder="150" /></label>
           <label>Brought by
-            <select value={form.broughtBy} onChange={handleChange("broughtBy")}>
-              {broughtByOptions(form.supervisingRequired).map((option) => (
+            <select value={form.broughtByPartnerId} onChange={handleChange("broughtByPartnerId")}>
+              {sourceOptions(partners).map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
@@ -135,22 +357,16 @@ export default function AdminPage() {
             <input
               type="checkbox"
               checked={form.supervisingRequired}
-              onChange={(e) => {
-                const supervisingRequired = e.target.checked;
-                setForm((prev) => ({
-                  ...prev,
-                  supervisingRequired,
-                  broughtBy: !supervisingRequired && prev.broughtBy === "CHRISTIANE" ? "JASON" : prev.broughtBy
-                }));
-              }}
+              onChange={(e) => setForm((prev) => ({ ...prev, supervisingRequired: e.target.checked }))}
             />
             Supervising required
           </label>
-          {form.monthlyAmountDollars && isValidCombination(form.broughtBy, form.supervisingRequired) && (
+          {form.monthlyAmountDollars && (
             <SplitPreview
               amountCents={Math.round(Number(form.monthlyAmountDollars) * 100)}
-              broughtBy={form.broughtBy}
-              supervisingRequired={form.supervisingRequired}
+              source={{ broughtByPartnerId: form.broughtByPartnerId || null, supervisingRequired: form.supervisingRequired, splitOverride: null }}
+              partners={partners}
+              rules={rules}
             />
           )}
 
@@ -188,6 +404,8 @@ export default function AdminPage() {
                 <ClientRow
                   key={client.id}
                   client={client}
+                  partners={partners}
+                  rules={rules}
                   open={openId === client.id}
                   onToggle={() => setOpenId(openId === client.id ? null : client.id)}
                   onChanged={loadClients}
@@ -201,14 +419,18 @@ export default function AdminPage() {
   );
 }
 
-function ClientRow({ client, open, onToggle, onChanged }) {
+function ClientRow({ client, partners, rules, open, onToggle, onChanged }) {
+  const activePartners = partners.filter((p) => p.active);
+
   const [edit, setEdit] = useState({
     name: client.name,
     email: client.email,
     oneTimeAmountDollars: (client.oneTimeAmountCents / 100).toString(),
     monthlyAmountDollars: (client.monthlyAmountCents / 100).toString(),
-    broughtBy: client.broughtBy,
-    supervisingRequired: client.supervisingRequired
+    broughtByPartnerId: client.broughtByPartnerId || "",
+    supervisingRequired: client.supervisingRequired,
+    overrideEnabled: Boolean(client.splitOverride),
+    overrideValues: client.splitOverride || {}
   });
   const [bill, setBill] = useState({ amountDollars: "", description: "" });
   const [busy, setBusy] = useState("");
@@ -233,10 +455,19 @@ function ClientRow({ client, open, onToggle, onChanged }) {
   };
 
   const saveEdit = async () => {
+    const payload = {
+      name: edit.name,
+      email: edit.email,
+      oneTimeAmountDollars: edit.oneTimeAmountDollars,
+      monthlyAmountDollars: edit.monthlyAmountDollars,
+      broughtByPartnerId: edit.broughtByPartnerId || null,
+      supervisingRequired: edit.supervisingRequired,
+      splitOverride: edit.overrideEnabled ? edit.overrideValues : null
+    };
     const data = await call("edit", `/api/admin/clients/${client.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(edit)
+      body: JSON.stringify(payload)
     });
     if (data) {
       setMsg("Saved.");
@@ -295,6 +526,22 @@ function ClientRow({ client, open, onToggle, onChanged }) {
   const editField = (field) => (e) => setEdit((p) => ({ ...p, [field]: e.target.value }));
   const billField = (field) => (e) => setBill((p) => ({ ...p, [field]: e.target.value }));
 
+  const toggleOverride = (e) => {
+    const enabled = e.target.checked;
+    setEdit((prev) => {
+      if (!enabled) return { ...prev, overrideEnabled: false };
+      const defaults = resolveSplitPercentages(
+        { broughtByPartnerId: prev.broughtByPartnerId || null, supervisingRequired: prev.supervisingRequired, splitOverride: null },
+        rules
+      ) || {};
+      return {
+        ...prev,
+        overrideEnabled: true,
+        overrideValues: Object.fromEntries(activePartners.map((p) => [p.id, defaults[p.id] ?? ""]))
+      };
+    });
+  };
+
   return (
     <>
       <tr>
@@ -303,11 +550,7 @@ function ClientRow({ client, open, onToggle, onChanged }) {
         <td>
           {formatCents(client.monthlyAmountCents)}/mo
           <br />
-          <SplitPreview
-            amountCents={client.monthlyAmountCents}
-            broughtBy={client.broughtBy}
-            supervisingRequired={client.supervisingRequired}
-          />
+          <SplitPreview amountCents={client.monthlyAmountCents} source={client} partners={partners} rules={rules} />
         </td>
         <td><span className={`dash-status dash-status-${client.subscriptionStatus.toLowerCase()}`}>{client.subscriptionStatus}</span></td>
         <td><span className={`dash-status dash-status-${client.isActive ? "paid" : "unpaid"}`}>{client.isActive ? "Active" : "Deactivated"}</span></td>
@@ -339,11 +582,8 @@ function ClientRow({ client, open, onToggle, onChanged }) {
                 </label>
                 <label>Monthly (USD)<input type="number" min="0" step="0.01" value={edit.monthlyAmountDollars} onChange={editField("monthlyAmountDollars")} /></label>
                 <label>Brought by
-                  <select
-                    value={edit.broughtBy}
-                    onChange={(e) => setEdit((p) => ({ ...p, broughtBy: e.target.value }))}
-                  >
-                    {broughtByOptions(edit.supervisingRequired).map((option) => (
+                  <select value={edit.broughtByPartnerId} onChange={editField("broughtByPartnerId")}>
+                    {sourceOptions(partners).map((option) => (
                       <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
                   </select>
@@ -352,24 +592,42 @@ function ClientRow({ client, open, onToggle, onChanged }) {
                   <input
                     type="checkbox"
                     checked={edit.supervisingRequired}
-                    onChange={(e) => {
-                      const supervisingRequired = e.target.checked;
-                      setEdit((prev) => ({
-                        ...prev,
-                        supervisingRequired,
-                        broughtBy: !supervisingRequired && prev.broughtBy === "CHRISTIANE" ? "JASON" : prev.broughtBy
-                      }));
-                    }}
+                    onChange={(e) => setEdit((prev) => ({ ...prev, supervisingRequired: e.target.checked }))}
                   />
                   Supervising required
                 </label>
-                {edit.monthlyAmountDollars && isValidCombination(edit.broughtBy, edit.supervisingRequired) && (
-                  <SplitPreview
-                    amountCents={Math.round(Number(edit.monthlyAmountDollars) * 100)}
-                    broughtBy={edit.broughtBy}
-                    supervisingRequired={edit.supervisingRequired}
-                  />
+
+                <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <input type="checkbox" checked={edit.overrideEnabled} onChange={toggleOverride} />
+                  Override split for this project
+                </label>
+                {edit.overrideEnabled && (
+                  <div style={{ display: "grid", gap: 8, paddingLeft: 4 }}>
+                    {activePartners.map((partner) => (
+                      <label key={partner.id}>{partner.name} %
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={edit.overrideValues[partner.id] ?? ""}
+                          onChange={(e) => setEdit((prev) => ({ ...prev, overrideValues: { ...prev.overrideValues, [partner.id]: e.target.value } }))}
+                        />
+                      </label>
+                    ))}
+                  </div>
                 )}
+
+                <SplitPreview
+                  amountCents={Math.round(Number(edit.monthlyAmountDollars || 0) * 100)}
+                  source={{
+                    broughtByPartnerId: edit.broughtByPartnerId || null,
+                    supervisingRequired: edit.supervisingRequired,
+                    splitOverride: edit.overrideEnabled ? edit.overrideValues : null
+                  }}
+                  partners={partners}
+                  rules={rules}
+                />
+
                 <button className="button button-primary" onClick={saveEdit} disabled={busy === "edit"}>{busy === "edit" ? "Saving..." : "Save details"}</button>
               </div>
 

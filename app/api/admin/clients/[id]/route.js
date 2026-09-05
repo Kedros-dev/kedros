@@ -3,7 +3,7 @@ import { requireAdmin } from "@/lib/admin";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
 import { mapInvoice } from "@/lib/invoices";
-import { isValidCombination } from "@/lib/partnerSplit";
+import { sanitizeSplitOverride } from "@/lib/partnerSplit";
 
 export const dynamic = "force-dynamic";
 
@@ -47,8 +47,9 @@ export async function GET(_request, { params }) {
       mustChangePassword: client.mustChangePassword,
       oneTimeAmountCents: client.oneTimeAmountCents,
       monthlyAmountCents: client.monthlyAmountCents,
-      broughtBy: client.broughtBy,
+      broughtByPartnerId: client.broughtByPartnerId,
       supervisingRequired: client.supervisingRequired,
+      splitOverride: client.splitOverride,
       subscriptionStatus: client.subscriptionStatus
     },
     invoices,
@@ -86,22 +87,15 @@ export async function PATCH(request, { params }) {
     data.monthlyAmountCents = Math.round(Number(body.monthlyAmountDollars || 0) * 100);
   }
   if (typeof body.isActive === "boolean") data.isActive = body.isActive;
-  if (typeof body.broughtBy === "string") data.broughtBy = body.broughtBy;
+  if (body.broughtByPartnerId !== undefined) data.broughtByPartnerId = body.broughtByPartnerId || null;
   if (typeof body.supervisingRequired === "boolean") data.supervisingRequired = body.supervisingRequired;
+  if (body.splitOverride !== undefined) data.splitOverride = sanitizeSplitOverride(body.splitOverride);
 
   if (
     (data.oneTimeAmountCents !== undefined && data.oneTimeAmountCents < 0) ||
     (data.monthlyAmountCents !== undefined && data.monthlyAmountCents < 0)
   ) {
     return NextResponse.json({ error: "Amounts must be positive." }, { status: 400 });
-  }
-
-  if (data.broughtBy !== undefined || data.supervisingRequired !== undefined) {
-    const broughtBy = data.broughtBy ?? client.broughtBy;
-    const supervisingRequired = data.supervisingRequired ?? client.supervisingRequired;
-    if (!isValidCombination(broughtBy, supervisingRequired)) {
-      return NextResponse.json({ error: "That brought-by / supervising combination has no defined split." }, { status: 400 });
-    }
   }
 
   const updated = await prisma.user.update({ where: { id: client.id }, data });

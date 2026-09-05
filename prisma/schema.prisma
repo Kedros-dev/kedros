@@ -19,13 +19,6 @@ enum SubscriptionStatus {
   CANCELED
 }
 
-enum BroughtBy {
-  JASON
-  JAD
-  CHRISTIANE
-  REFERRAL
-}
-
 model User {
   id          String   @id @default(cuid())
   email       String   @unique
@@ -43,12 +36,46 @@ model User {
   monthlyAmountCents  Int @default(0)
 
   // Determines how the monthly subscription is split between partners (see lib/partnerSplit.js).
-  broughtBy           BroughtBy @default(JASON)
-  supervisingRequired Boolean   @default(true)
+  // Null broughtByPartnerId means the project came from a referral, not a partner.
+  broughtByPartnerId  String?
+  broughtByPartner    Partner? @relation(fields: [broughtByPartnerId], references: [id])
+  supervisingRequired Boolean  @default(true)
+
+  // Custom { [partnerId]: percentage } split for this client only. When set, it overrides
+  // whatever SplitRule would otherwise apply for broughtByPartnerId + supervisingRequired.
+  splitOverride Json?
 
   // Stripe linkage.
   stripeCustomerId String?              @unique
   oneTimePaidAt    DateTime?
   subscriptionId   String?              @unique
   subscriptionStatus SubscriptionStatus @default(NONE)
+}
+
+// A person who can be credited with bringing in a project and/or receive a share of it.
+// Deactivating (rather than deleting) a partner keeps historical splits on old clients intact.
+model Partner {
+  id        String   @id @default(cuid())
+  name      String
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  clients    User[]
+  splitRules SplitRule[]
+}
+
+// The default percentage split for a given "who brought it" source (a partner, or null for
+// referral) and whether supervising is required. Editable from the admin panel so the split
+// table can change as partners are added or removed, without a code deploy.
+model SplitRule {
+  id                  String   @id @default(cuid())
+  broughtByPartnerId  String?
+  broughtByPartner    Partner? @relation(fields: [broughtByPartnerId], references: [id])
+  supervisingRequired Boolean
+
+  // { [partnerId]: percentage }
+  splits Json
+
+  updatedAt DateTime @updatedAt
 }
