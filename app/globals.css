@@ -441,6 +441,8 @@ h1 em { color: #642dd4; font-style: normal; }
 .adm-field { color: #0f134e; display: grid; gap: 6px; min-width: 0; }
 .adm-label { color: #0f134e; font-size: 12px; font-weight: 600; }
 .adm-hint { color: #656989; font-size: 11px; }
+.adm-check-block { display: grid; gap: 4px; }
+.adm-check { align-items: center; color: #0f134e; cursor: pointer; display: inline-flex; font-size: 13px; font-weight: 600; gap: 8px; width: max-content; }
 
 .adm-input { background: #fff; border: 1px solid #cad4e1; border-radius: 6px; color: #0f134e; font-size: 13px; height: 40px; min-width: 0; padding: 0 12px; transition: border-color .15s ease, box-shadow .15s ease; width: 100%; }
 .adm-input::placeholder { color: #9aa3b8; }

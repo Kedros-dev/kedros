@@ -9,24 +9,13 @@ function formatCents(cents) {
   return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
 }
 
-const INVOICE_KINDS = [
-  { value: "SETUP_FEE", label: "Setup fee" },
-  { value: "CUSTOM", label: "One-off" }
-];
-const KIND_TITLES = { SETUP_FEE: "Setup fee" };
 const INVOICE_LABEL = { SCHEDULED: "Scheduled", SENT: "Sent", SENDING: "Sending", FAILED: "Failed", CANCELED: "Canceled" };
 const INVOICE_TONE = { SCHEDULED: "amber", SENT: "green", SENDING: "blue", FAILED: "red", CANCELED: "grey" };
 const SUB_TONE = { ACTIVE: "green", PAST_DUE: "amber", CANCELED: "red" };
 
-function defaultLines(kind, client) {
-  if (kind === "SETUP_FEE" && client.oneTimeAmountCents > 0) {
-    return [{ description: "Setup fee", amountDollars: (client.oneTimeAmountCents / 100).toString() }];
-  }
-  return [{ description: "", amountDollars: "" }];
-}
-
-function initialInvoice(client) {
-  return { kind: "SETUP_FEE", title: "", lines: defaultLines("SETUP_FEE", client), memo: "", daysUntilDue: "7", delivery: "now", sendAtLocal: "" };
+// Blank invoice builder. setupFee is the "This is the client's setup fee" checkbox.
+function initialInvoice() {
+  return { title: "", setupFee: false, lines: [{ description: "", amountDollars: "" }], memo: "", daysUntilDue: "7", delivery: "now", sendAtLocal: "" };
 }
 
 // Earliest allowed value for a datetime-local input (local time).
@@ -556,7 +545,7 @@ function ClientRow({ client, open, onToggle, onChanged }) {
     monthlyAmountDollars: (client.monthlyAmountCents / 100).toString(),
     monthlyStartAt: isoToLocalInput(client.monthlyStartAt)
   });
-  const [invoice, setInvoice] = useState(() => initialInvoice(client));
+  const [invoice, setInvoice] = useState(() => initialInvoice());
   const [invoices, setInvoices] = useState([]);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
@@ -597,6 +586,8 @@ function ClientRow({ client, open, onToggle, onChanged }) {
   }, [open]);
 
   const setupInv = findSetupInvoice(invoices);
+  // The setup-fee checkbox only shows while the client has no live setup invoice and has not paid it.
+  const canMarkSetup = !setupInv && !client.oneTimePaidAt;
 
   const saveEdit = async () => {
     const { monthlyStartAt, oneTimeAmountDollars, ...details } = edit;
@@ -685,8 +676,17 @@ function ClientRow({ client, open, onToggle, onChanged }) {
     if (data) onChanged();
   };
 
-  const changeKind = (kind) => {
-    setInvoice((p) => ({ ...p, kind, lines: defaultLines(kind, client) }));
+  // Ticking "setup fee" prefills one row from the client's setup amount, but only when the rows are blank.
+  const toggleSetupFee = (checked) => {
+    setInvoice((p) => {
+      const blank = p.lines.every((l) => !l.description.trim() && !String(l.amountDollars).trim());
+      const prefill = checked && blank && client.oneTimeAmountCents > 0;
+      return {
+        ...p,
+        setupFee: checked,
+        lines: prefill ? [{ description: "Setup fee", amountDollars: (client.oneTimeAmountCents / 100).toString() }] : p.lines
+      };
+    });
   };
 
   const setLine = (index, field, value) => {
@@ -738,15 +738,14 @@ function ClientRow({ client, open, onToggle, onChanged }) {
       sendAt = when.toISOString();
     }
 
-    const title = invoice.kind === "CUSTOM"
-      ? invoice.title.trim() || valid[0].description.trim()
-      : KIND_TITLES[invoice.kind];
+    const isSetup = canMarkSetup && invoice.setupFee;
+    const title = invoice.title.trim() || (isSetup ? "Setup fee" : "");
 
     const data = await call("invoice", `/api/admin/clients/${client.id}/invoices`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        kind: invoice.kind,
+        kind: isSetup ? "SETUP_FEE" : "CUSTOM",
         title,
         lineItems: valid.map((l) => ({ description: l.description.trim(), amountDollars: Number(l.amountDollars) })),
         sendAt,
@@ -755,7 +754,7 @@ function ClientRow({ client, open, onToggle, onChanged }) {
       })
     });
     if (data) {
-      setInvoice(initialInvoice(client));
+      setInvoice(initialInvoice());
       await loadInvoices();
       setMsg(sendAt ? `Invoice scheduled for ${formatDateTime(sendAt)}.` : "Invoice sent to the client's email.");
     }
@@ -773,7 +772,7 @@ function ClientRow({ client, open, onToggle, onChanged }) {
   const editField = (field) => (e) => setEdit((p) => ({ ...p, [field]: e.target.value }));
 
   const totalCents = invoice.lines.reduce((sum, l) => sum + toCents(l.amountDollars), 0);
-  const kindLabel = INVOICE_KINDS.find((k) => k.value === invoice.kind)?.label || "";
+  const summaryTitle = invoice.title.trim() || (canMarkSetup && invoice.setupFee ? "Setup fee" : "Invoice");
   const submitLabel = invoice.delivery === "later" ? "Schedule invoice" : "Send invoice now";
   const subActive = client.subscriptionStatus === "ACTIVE";
 
@@ -871,7 +870,7 @@ function ClientRow({ client, open, onToggle, onChanged }) {
                       )}
                     </div>
                   ) : (
-                    <Field label="Setup fee (USD)" hint={client.oneTimePaidAt ? "Paid, locked" : "No setup invoice yet. Create one in the Invoices card below."}>
+                    <Field label="Setup fee (USD)" hint={client.oneTimePaidAt ? "Paid, locked" : "No setup invoice yet. Create one in the Invoices card below and tick 'This is the client's setup fee'."}>
                       <input
                         className="adm-input"
                         type="number"
@@ -952,25 +951,19 @@ function ClientRow({ client, open, onToggle, onChanged }) {
                         <span>{client.email}</span>
                       </div>
                     </div>
-                    <div className="adm-seg" role="group" aria-label="Invoice type">
-                      {INVOICE_KINDS.map((k) => (
-                        <button
-                          key={k.value}
-                          type="button"
-                          aria-pressed={invoice.kind === k.value}
-                          className={`adm-seg-btn${invoice.kind === k.value ? " is-on" : ""}`}
-                          onClick={() => changeKind(k.value)}
-                        >
-                          {k.label}
-                        </button>
-                      ))}
-                    </div>
                   </div>
 
-                  {invoice.kind === "CUSTOM" && (
-                    <Field label="Invoice title" hint="Shown on the invoice. Defaults to the first line item.">
-                      <input className="adm-input" value={invoice.title} onChange={invField("title")} placeholder="e.g. Website add-ons" />
-                    </Field>
+                  <Field label="Title">
+                    <input className="adm-input" value={invoice.title} onChange={invField("title")} placeholder="e.g. Website redesign" />
+                  </Field>
+                  {canMarkSetup && (
+                    <div className="adm-check-block">
+                      <label className="adm-check">
+                        <input type="checkbox" checked={invoice.setupFee} onChange={(e) => toggleSetupFee(e.target.checked)} />
+                        <span>This is the client's setup fee</span>
+                      </label>
+                      <span className="adm-hint">Marks the setup fee as paid when the client pays this invoice.</span>
+                    </div>
                   )}
 
                   <table className="adm-lines">
@@ -1043,7 +1036,7 @@ function ClientRow({ client, open, onToggle, onChanged }) {
                   </div>
 
                   <div className="adm-actions">
-                    <span className="adm-muted adm-kind-note">{kindLabel} · due in {invoice.daysUntilDue || "–"} days</span>
+                    <span className="adm-muted adm-kind-note">{summaryTitle} · due in {invoice.daysUntilDue || "–"} days</span>
                     <button className="adm-btn adm-btn-primary" type="button" onClick={submitInvoice} disabled={busy === "invoice"}>
                       {invoice.delivery === "later" ? <CalendarClock size={15} /> : <Send size={15} />}
                       {busy === "invoice" ? "Working..." : submitLabel}
