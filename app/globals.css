@@ -551,6 +551,12 @@ h1 em { color: #642dd4; font-style: normal; }
 .adm-tl-actions { align-items: center; display: flex; gap: 14px; }
 .adm-link { align-items: center; color: #161a5c; display: inline-flex; font-size: 12px; font-weight: 600; gap: 4px; }
 .adm-link:hover { color: #642dd4; }
+.adm-editor { display: grid; flex: 1 1 100%; gap: 14px; }
+.adm-setup-inv { border: 1px solid #e3e8f0; border-radius: 10px; display: grid; gap: 14px; padding: 18px; }
+.adm-setup-head, .adm-setup-foot { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; }
+.adm-setup-notes { color: #656989; display: grid; font-size: 13px; gap: 4px; }
+.adm-setup-notes p { color: #0f134e; margin: 0; white-space: pre-wrap; }
+.adm-lines-ro td { font-size: 13px; color: #0f134e; }
 
 @media (max-width: 860px) {
   .adm-manage { grid-template-columns: 1fr; padding: 14px; }

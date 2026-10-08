@@ -135,6 +135,135 @@ function invoiceSummary(inv) {
   return `${label}: scheduled for ${formatDateTime(inv.sendAt)}`;
 }
 
+function lineItemsTotalCents(lines) {
+  return completeSetupLines(lines).reduce((sum, l) => sum + toCents(l.amountDollars), 0);
+}
+
+// Error for the line-item editor: needs at least one complete row and no half-filled rows.
+function lineItemsProblem(lines) {
+  if (completeSetupLines(lines).length === 0) {
+    return "Add at least one line item with a description and an amount above zero.";
+  }
+  return setupLinesError(lines);
+}
+
+// Saved invoice line items (cents) to editor rows (dollar strings).
+function breakdownToLines(lineItems) {
+  if (!lineItems || lineItems.length === 0) return [{ description: "", amountDollars: "" }];
+  return lineItems.map((l) => ({ description: l.description || "", amountDollars: (l.amountCents / 100).toString() }));
+}
+
+// Shared line-item editor: rows, add/remove, live total and notes.
+// Used by the Add a client form, the Details setup invoice and invoice history.
+function LineItemsEditor({ lines, onChange, memo, onMemoChange, memoHint, memoPlaceholder }) {
+  const setLine = (index, field, value) =>
+    onChange(lines.map((l, i) => (i === index ? { ...l, [field]: value } : l)));
+  const removeLine = (index) => onChange(lines.filter((_, i) => i !== index));
+  const addLine = () => onChange([...lines, { description: "", amountDollars: "" }]);
+
+  return (
+    <>
+      <table className="adm-lines">
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th className="adm-right">Amount (USD)</th>
+            <th aria-label="Remove"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {lines.map((line, i) => (
+            <tr key={i}>
+              <td>
+                <input className="adm-input adm-input-plain" value={line.description} onChange={(e) => setLine(i, "description", e.target.value)} placeholder="Description" />
+              </td>
+              <td>
+                <div className="adm-money">
+                  <span>$</span>
+                  <input className="adm-input adm-input-plain" type="number" min="0" step="0.01" value={line.amountDollars} onChange={(e) => setLine(i, "amountDollars", e.target.value)} placeholder="0.00" />
+                </div>
+              </td>
+              <td className="adm-right">
+                <button type="button" className="adm-icon-btn" aria-label="Remove line item" onClick={() => removeLine(i)}>
+                  <X size={15} />
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="adm-lines-foot">
+        <button type="button" className="adm-btn adm-btn-ghost adm-btn-sm" onClick={addLine}>
+          <Plus size={14} /> Add line item
+        </button>
+      </div>
+      <div className="adm-totals">
+        <div className="adm-totals-note" />
+        <div className="adm-total">
+          <span>Total</span>
+          <strong>{formatCents(lineItemsTotalCents(lines))}</strong>
+        </div>
+      </div>
+      <Field label="Notes (optional)" hint={memoHint}>
+        <textarea className="adm-input adm-textarea" rows={3} value={memo} onChange={(e) => onMemoChange(e.target.value)} placeholder={memoPlaceholder} />
+      </Field>
+    </>
+  );
+}
+
+// Editor for an existing invoice's breakdown and notes. Calls onSubmit({ lineItems, memo }).
+function InvoiceBreakdownEditor({ invoice, saving, submitLabel, onSubmit, onCancel }) {
+  const [lines, setLines] = useState(() => breakdownToLines(invoice.lineItems));
+  const [memo, setMemo] = useState(invoice.memo || "");
+  const [problem, setProblem] = useState("");
+
+  const submit = () => {
+    const p = lineItemsProblem(lines);
+    if (p) {
+      setProblem(p);
+      return;
+    }
+    setProblem("");
+    onSubmit({
+      lineItems: completeSetupLines(lines).map((l) => ({ description: l.description.trim(), amountDollars: Number(l.amountDollars) })),
+      memo: memo.trim()
+    });
+  };
+
+  return (
+    <div className="adm-editor">
+      <LineItemsEditor
+        lines={lines}
+        onChange={setLines}
+        memo={memo}
+        onMemoChange={setMemo}
+        memoHint="Printed on the invoice."
+      />
+      {problem && <p className="adm-alert-error adm-inline">{problem}</p>}
+      <div className="adm-actions">
+        <button type="button" className="adm-btn adm-btn-outline adm-btn-sm" onClick={onCancel} disabled={saving}>Cancel</button>
+        <button type="button" className="adm-btn adm-btn-primary adm-btn-sm" onClick={submit} disabled={saving}>
+          {saving ? "Saving..." : submitLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Newest setup invoice that is still live (ignores canceled ones). The list is newest first.
+const SETUP_LIVE_STATUSES = ["SCHEDULED", "SENDING", "SENT", "FAILED"];
+function findSetupInvoice(invoices) {
+  return invoices.find((i) => i.kind === "SETUP_FEE" && SETUP_LIVE_STATUSES.includes(i.status)) || null;
+}
+
+function setupStatusPill(inv, paid) {
+  if (paid) return { tone: "green", label: "Paid" };
+  if (inv.status === "SCHEDULED") return { tone: "amber", label: `Scheduled for ${formatDateTime(inv.sendAt)}` };
+  if (inv.status === "SENT") return { tone: "green", label: "Sent" };
+  if (inv.status === "FAILED") return { tone: "red", label: "Failed" };
+  return { tone: INVOICE_TONE[inv.status] || "blue", label: INVOICE_LABEL[inv.status] || inv.status };
+}
+
 export default function AdminPage() {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -151,12 +280,6 @@ export default function AdminPage() {
   const itemizing = itemsComplete.length > 0;
   const itemsTotalCents = itemsComplete.reduce((sum, l) => sum + toCents(l.amountDollars), 0);
   const setupCents = itemizing ? itemsTotalCents : toCents(form.oneTimeAmountDollars);
-
-  const updateSetupLines = (fn) => setForm((p) => ({ ...p, setupLines: fn(p.setupLines) }));
-  const setSetupLine = (index, field, value) =>
-    updateSetupLines((lines) => lines.map((l, i) => (i === index ? { ...l, [field]: value } : l)));
-  const removeSetupLine = (index) => updateSetupLines((lines) => lines.filter((_, i) => i !== index));
-  const addSetupLine = () => updateSetupLines((lines) => [...lines, { description: "", amountDollars: "" }]);
 
   const toggleItemize = () => {
     if (!itemizeOpen) {
@@ -309,52 +432,14 @@ export default function AdminPage() {
                 </button>
               </div>
               {itemizeOpen && (
-                <>
-                  <table className="adm-lines">
-                    <thead>
-                      <tr>
-                        <th>Description</th>
-                        <th className="adm-right">Amount (USD)</th>
-                        <th aria-label="Remove"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {form.setupLines.map((line, i) => (
-                        <tr key={i}>
-                          <td>
-                            <input className="adm-input adm-input-plain" value={line.description} onChange={(e) => setSetupLine(i, "description", e.target.value)} placeholder="Description" />
-                          </td>
-                          <td>
-                            <div className="adm-money">
-                              <span>$</span>
-                              <input className="adm-input adm-input-plain" type="number" min="0" step="0.01" value={line.amountDollars} onChange={(e) => setSetupLine(i, "amountDollars", e.target.value)} placeholder="0.00" />
-                            </div>
-                          </td>
-                          <td className="adm-right">
-                            <button type="button" className="adm-icon-btn" aria-label="Remove line item" onClick={() => removeSetupLine(i)}>
-                              <X size={15} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <div className="adm-lines-foot">
-                    <button type="button" className="adm-btn adm-btn-ghost adm-btn-sm" onClick={addSetupLine}>
-                      <Plus size={14} /> Add line item
-                    </button>
-                  </div>
-                  <div className="adm-totals">
-                    <div className="adm-totals-note" />
-                    <div className="adm-total">
-                      <span>Total</span>
-                      <strong>{formatCents(itemsTotalCents)}</strong>
-                    </div>
-                  </div>
-                  <Field label="Notes (optional)" hint="Printed on the setup invoice.">
-                    <textarea className="adm-input adm-textarea" rows={3} value={form.setupMemo} onChange={handleChange("setupMemo")} placeholder="Initial build $200, domain $15 ..." />
-                  </Field>
-                </>
+                <LineItemsEditor
+                  lines={form.setupLines}
+                  onChange={(setupLines) => setForm((p) => ({ ...p, setupLines }))}
+                  memo={form.setupMemo}
+                  onMemoChange={(setupMemo) => setForm((p) => ({ ...p, setupMemo }))}
+                  memoHint="Printed on the setup invoice."
+                  memoPlaceholder="Initial build $200, domain $15 ..."
+                />
               )}
               {setupCents > 0 && (
                 <Timing
@@ -462,6 +547,8 @@ function ClientRow({ client, open, onToggle, onChanged }) {
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
+  // Which breakdown editor is open: { id, where: "details" | "history" }.
+  const [editing, setEditing] = useState(null);
 
   const call = async (label, url, options) => {
     setBusy(label);
@@ -495,9 +582,13 @@ function ClientRow({ client, open, onToggle, onChanged }) {
     if (open) loadInvoices();
   }, [open]);
 
+  const setupInv = findSetupInvoice(invoices);
+
   const saveEdit = async () => {
-    const { monthlyStartAt, ...details } = edit;
+    const { monthlyStartAt, oneTimeAmountDollars, ...details } = edit;
     const body = { ...details };
+    // With a setup invoice, its line items set the amount, so the plain amount is not sent.
+    if (!setupInv) body.oneTimeAmountDollars = oneTimeAmountDollars;
     // Once subscribed, the first-charge date can no longer be changed.
     if (client.subscriptionStatus !== "ACTIVE") {
       body.monthlyStartAt = monthlyStartAt ? new Date(monthlyStartAt).toISOString() : null;
@@ -509,6 +600,40 @@ function ClientRow({ client, open, onToggle, onChanged }) {
     });
     if (data) {
       setMsg("Saved.");
+      await loadInvoices();
+      onChanged();
+    }
+  };
+
+  // Saves a new breakdown for an unpaid invoice. A SENT invoice is voided and replaced by the API.
+  const saveBreakdown = async (inv, payload) => {
+    const sent = inv.status === "SENT";
+    if (sent && !window.confirm("This voids the invoice already sent to the client and emails them a corrected one.")) {
+      return;
+    }
+    const body = { ...payload };
+    // Scheduled or failed invoices keep their send date; a sent one is re-sent now.
+    if (sent) body.sendAt = null;
+    const data = await call(`edit-${inv.id}`, `/api/admin/clients/${client.id}/invoices/${inv.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (!data) return;
+    setEditing(null);
+    if (data.replaced) setMsg("Old invoice voided and a corrected invoice was sent.");
+    else setMsg(inv.kind === "SETUP_FEE" ? "Setup invoice updated." : "Invoice updated.");
+    await loadInvoices();
+    onChanged();
+  };
+
+  const voidInvoice = async (inv) => {
+    if (!window.confirm("Void this invoice? The payment link will stop working.")) return;
+    const data = await call(`void-${inv.id}`, `/api/admin/clients/${client.id}/invoices/${inv.id}`, { method: "DELETE" });
+    if (data) {
+      setEditing(null);
+      setMsg("Invoice voided.");
+      await loadInvoices();
       onChanged();
     }
   };
@@ -678,17 +803,77 @@ function ClientRow({ client, open, onToggle, onChanged }) {
                 <div className="adm-stack">
                   <Field label="Name"><input className="adm-input" value={edit.name} onChange={editField("name")} /></Field>
                   <Field label="Email"><input className="adm-input" type="email" value={edit.email} onChange={editField("email")} /></Field>
-                  <Field label="Setup fee (USD)" hint={client.oneTimePaidAt ? "Paid, locked" : undefined}>
-                    <input
-                      className="adm-input"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={edit.oneTimeAmountDollars}
-                      onChange={editField("oneTimeAmountDollars")}
-                      disabled={Boolean(client.oneTimePaidAt)}
-                    />
-                  </Field>
+                  {setupInv ? (
+                    <div className="adm-setup-inv">
+                      <div className="adm-setup-head">
+                        <span className="adm-label">Setup invoice</span>
+                        <span className={`adm-pill adm-pill-${setupStatusPill(setupInv, client.oneTimePaidAt).tone}`}>
+                          {setupStatusPill(setupInv, client.oneTimePaidAt).label}
+                        </span>
+                      </div>
+                      {setupInv.status === "FAILED" && setupInv.error && <p className="adm-alert-error adm-inline">{setupInv.error}</p>}
+
+                      {editing?.where === "details" && editing.id === setupInv.id ? (
+                        <InvoiceBreakdownEditor
+                          invoice={setupInv}
+                          saving={busy === `edit-${setupInv.id}`}
+                          submitLabel={setupInv.status === "SENT" ? "Void & send updated invoice" : "Save changes"}
+                          onSubmit={(payload) => saveBreakdown(setupInv, payload)}
+                          onCancel={() => setEditing(null)}
+                        />
+                      ) : (
+                        <>
+                          <table className="adm-lines adm-lines-ro">
+                            <tbody>
+                              {setupInv.lineItems.map((l, i) => (
+                                <tr key={i}>
+                                  <td>{l.description}</td>
+                                  <td className="adm-right">{formatCents(l.amountCents)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          {setupInv.memo && (
+                            <div className="adm-setup-notes">
+                              <span className="adm-label">Notes</span>
+                              <p>{setupInv.memo}</p>
+                            </div>
+                          )}
+                          <div className="adm-setup-foot">
+                            <div className="adm-total">
+                              <span>Total</span>
+                              <strong>{formatCents(setupInv.totalCents)}</strong>
+                            </div>
+                            {client.oneTimePaidAt ? (
+                              <span className="adm-muted">Paid, locked</span>
+                            ) : (
+                              setupInv.status !== "SENDING" && (
+                                <button
+                                  type="button"
+                                  className="adm-btn adm-btn-ghost adm-btn-sm"
+                                  onClick={() => setEditing({ id: setupInv.id, where: "details" })}
+                                >
+                                  Edit breakdown
+                                </button>
+                              )
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <Field label="Setup fee (USD)" hint={client.oneTimePaidAt ? "Paid, locked" : "No setup invoice yet. Create one in the Invoices card below."}>
+                      <input
+                        className="adm-input"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={edit.oneTimeAmountDollars}
+                        onChange={editField("oneTimeAmountDollars")}
+                        disabled={Boolean(client.oneTimePaidAt)}
+                      />
+                    </Field>
+                  )}
                   <Field label="Monthly (USD)">
                     <input className="adm-input" type="number" min="0" step="0.01" value={edit.monthlyAmountDollars} onChange={editField("monthlyAmountDollars")} />
                   </Field>
@@ -866,6 +1051,8 @@ function ClientRow({ client, open, onToggle, onChanged }) {
                         ? `Sent ${formatDateTime(inv.sentAt)}`
                         : `Scheduled for ${formatDateTime(inv.sendAt)}`;
                       const cancelable = inv.status === "SCHEDULED" || inv.status === "FAILED";
+                      const editable = cancelable;
+                      const isEditing = editing?.where === "history" && editing.id === inv.id;
                       return (
                         <li key={inv.id} className="adm-tl-item">
                           <div className="adm-tl-main">
@@ -875,6 +1062,7 @@ function ClientRow({ client, open, onToggle, onChanged }) {
                             </div>
                             <div className="adm-tl-meta">{formatCents(inv.totalCents)} · {when}</div>
                             {inv.status === "FAILED" && inv.error && <p className="adm-alert-error adm-inline">{inv.error}</p>}
+                            {inv.status === "CANCELED" && inv.error && <p className="adm-muted adm-inline">{inv.error}</p>}
                           </div>
                           <div className="adm-tl-actions">
                             {inv.hostedInvoiceUrl && (
@@ -882,12 +1070,31 @@ function ClientRow({ client, open, onToggle, onChanged }) {
                                 View <ExternalLink size={13} />
                               </a>
                             )}
-                            {cancelable && (
+                            {!isEditing && editable && (
+                              <button className="adm-btn adm-btn-ghost adm-btn-sm" onClick={() => setEditing({ id: inv.id, where: "history" })}>
+                                Edit
+                              </button>
+                            )}
+                            {!isEditing && cancelable && (
                               <button className="adm-btn adm-btn-outline adm-btn-sm" onClick={() => cancelInvoice(inv)} disabled={busy === `cancel-${inv.id}`}>
                                 {busy === `cancel-${inv.id}` ? "Canceling..." : "Cancel"}
                               </button>
                             )}
+                            {inv.status === "SENT" && (
+                              <button className="adm-btn adm-btn-outline adm-btn-sm" onClick={() => voidInvoice(inv)} disabled={busy === `void-${inv.id}`}>
+                                {busy === `void-${inv.id}` ? "Voiding..." : "Void"}
+                              </button>
+                            )}
                           </div>
+                          {isEditing && (
+                            <InvoiceBreakdownEditor
+                              invoice={inv}
+                              saving={busy === `edit-${inv.id}`}
+                              submitLabel="Save changes"
+                              onSubmit={(payload) => saveBreakdown(inv, payload)}
+                              onCancel={() => setEditing(null)}
+                            />
+                          )}
                         </li>
                       );
                     })}
