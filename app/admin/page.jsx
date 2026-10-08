@@ -1053,7 +1053,8 @@ function ClientRow({ client, open, onToggle, onChanged }) {
                         ? `Sent ${formatDateTime(inv.sentAt)}`
                         : `Scheduled for ${formatDateTime(inv.sendAt)}`;
                       const cancelable = inv.status === "SCHEDULED" || inv.status === "FAILED";
-                      const editable = cancelable;
+                      // Sent invoices can be edited too; saving voids them and sends a corrected one.
+                      const editable = cancelable || inv.status === "SENT";
                       const isEditing = editing?.where === "history" && editing.id === inv.id;
                       return (
                         <li key={inv.id} className="adm-tl-item">
@@ -1092,7 +1093,7 @@ function ClientRow({ client, open, onToggle, onChanged }) {
                             <InvoiceBreakdownEditor
                               invoice={inv}
                               saving={busy === `edit-${inv.id}`}
-                              submitLabel="Save changes"
+                              submitLabel={inv.status === "SENT" ? "Void & send updated invoice" : "Save changes"}
                               onSubmit={(payload) => saveBreakdown(inv, payload)}
                               onCancel={() => setEditing(null)}
                             />
