@@ -11,10 +11,9 @@ function formatCents(cents) {
 
 const INVOICE_KINDS = [
   { value: "SETUP_FEE", label: "Setup fee" },
-  { value: "MONTHLY", label: "Monthly" },
   { value: "CUSTOM", label: "One-off" }
 ];
-const KIND_TITLES = { SETUP_FEE: "Setup fee", MONTHLY: "Monthly subscription" };
+const KIND_TITLES = { SETUP_FEE: "Setup fee" };
 const INVOICE_LABEL = { SCHEDULED: "Scheduled", SENT: "Sent", SENDING: "Sending", FAILED: "Failed", CANCELED: "Canceled" };
 const INVOICE_TONE = { SCHEDULED: "amber", SENT: "green", SENDING: "blue", FAILED: "red", CANCELED: "grey" };
 const SUB_TONE = { ACTIVE: "green", PAST_DUE: "amber", CANCELED: "red" };
@@ -22,9 +21,6 @@ const SUB_TONE = { ACTIVE: "green", PAST_DUE: "amber", CANCELED: "red" };
 function defaultLines(kind, client) {
   if (kind === "SETUP_FEE" && client.oneTimeAmountCents > 0) {
     return [{ description: "Setup fee", amountDollars: (client.oneTimeAmountCents / 100).toString() }];
-  }
-  if (kind === "MONTHLY" && client.monthlyAmountCents > 0) {
-    return [{ description: "Monthly subscription", amountDollars: (client.monthlyAmountCents / 100).toString() }];
   }
   return [{ description: "", amountDollars: "" }];
 }
@@ -48,6 +44,15 @@ function formatDateTime(iso) {
   return iso ? new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "";
 }
 
+// ISO string to the local value expected by a datetime-local input.
+function isoToLocalInput(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+}
+
 function Field({ label, hint, span, children }) {
   return (
     <label className={`adm-field${span ? " adm-span-2" : ""}`}>
@@ -64,9 +69,8 @@ const SETUP_TIMING_OPTIONS = [
   { value: "none", label: "Don't create yet" }
 ];
 const MONTHLY_TIMING_OPTIONS = [
-  { value: "now", label: "Start subscription now" },
-  { value: "schedule", label: "Start on a date" },
-  { value: "none", label: "Don't start yet" }
+  { value: "signup", label: "First charge when the client subscribes" },
+  { value: "schedule", label: "First charge on a specific date" }
 ];
 
 const EMPTY_CLIENT_FORM = {
@@ -76,7 +80,7 @@ const EMPTY_CLIENT_FORM = {
   monthlyAmountDollars: "",
   setupMode: "now",
   setupSendAt: "",
-  monthlyMode: "now",
+  monthlyMode: "signup",
   monthlyStartAt: ""
 };
 
@@ -107,10 +111,10 @@ function scheduleError(active, mode, at, what) {
   return "";
 }
 
-// One-line summary of a created client invoice or subscription.
-function invoiceSummary(inv, monthly) {
-  const label = monthly ? "Subscription" : "Setup invoice";
-  if (inv.status === "SENT") return `${label}: ${monthly ? "started" : "sent"}`;
+// One-line summary of a created client setup invoice.
+function invoiceSummary(inv) {
+  const label = "Setup invoice";
+  if (inv.status === "SENT") return `${label}: sent`;
   if (inv.status === "FAILED") return `${label}: failed: ${inv.error || "unknown error"}`;
   if (inv.status === "SENDING") return `${label}: sending`;
   return `${label}: scheduled for ${formatDateTime(inv.sendAt)}`;
@@ -165,12 +169,12 @@ export default function AdminPage() {
       oneTimeAmountDollars: form.oneTimeAmountDollars,
       monthlyAmountDollars: form.monthlyAmountDollars,
       setupMode: setupActive ? form.setupMode : "none",
-      monthlyMode: monthlyActive ? form.monthlyMode : "none"
+      monthlyMode: monthlyActive ? form.monthlyMode : "signup"
     };
     if (payload.setupMode === "schedule") {
       payload.setupSendAt = new Date(form.setupSendAt).toISOString();
     }
-    if (payload.monthlyMode === "schedule") {
+    if (monthlyActive && payload.monthlyMode === "schedule") {
       payload.monthlyStartAt = new Date(form.monthlyStartAt).toISOString();
     }
 
@@ -188,7 +192,13 @@ export default function AdminPage() {
       return;
     }
 
-    setCreated({ email: data.client.email, tempPassword: data.tempPassword, invoices: data.invoices || {} });
+    setCreated({
+      email: data.client.email,
+      tempPassword: data.tempPassword,
+      invoices: data.invoices || {},
+      monthly: monthlyActive,
+      monthlyStartAt: payload.monthlyStartAt || null
+    });
     setForm(EMPTY_CLIENT_FORM);
     loadClients();
   };
@@ -245,8 +255,8 @@ export default function AdminPage() {
               </Field>
               {toCents(form.monthlyAmountDollars) > 0 && (
                 <Timing
-                  label="Subscription start"
-                  hint="The subscription starts on the date you choose; Stripe then emails an invoice every month."
+                  label="Monthly billing"
+                  hint="No email is sent. Tell the client to open their account page and press Subscribe monthly; their card is then charged automatically every month and they get a receipt."
                   options={MONTHLY_TIMING_OPTIONS}
                   mode={form.monthlyMode}
                   at={form.monthlyStartAt}
@@ -273,8 +283,13 @@ export default function AdminPage() {
                   <dt>Email</dt><dd>{created.email}</dd>
                   <dt>Temporary password</dt><dd>{created.tempPassword}</dd>
                 </dl>
-                {created.invoices?.setup && <p className="adm-creds-line">{invoiceSummary(created.invoices.setup, false)}</p>}
-                {created.invoices?.monthly && <p className="adm-creds-line">{invoiceSummary(created.invoices.monthly, true)}</p>}
+                {created.invoices?.setup && <p className="adm-creds-line">{invoiceSummary(created.invoices.setup)}</p>}
+                {created.monthly && (
+                  <p className="adm-creds-line">
+                    Monthly: client subscribes from their account page
+                    {created.monthlyStartAt && ` — first charge ${formatDateTime(created.monthlyStartAt)}`}
+                  </p>
+                )}
               </div>
               <button type="button" className="adm-btn adm-btn-ghost adm-btn-sm" onClick={copyCredentials}>
                 {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? "Copied" : "Copy details"}
@@ -320,7 +335,8 @@ function ClientRow({ client, open, onToggle, onChanged }) {
     name: client.name,
     email: client.email,
     oneTimeAmountDollars: (client.oneTimeAmountCents / 100).toString(),
-    monthlyAmountDollars: (client.monthlyAmountCents / 100).toString()
+    monthlyAmountDollars: (client.monthlyAmountCents / 100).toString(),
+    monthlyStartAt: isoToLocalInput(client.monthlyStartAt)
   });
   const [invoice, setInvoice] = useState(() => initialInvoice(client));
   const [invoices, setInvoices] = useState([]);
@@ -361,10 +377,16 @@ function ClientRow({ client, open, onToggle, onChanged }) {
   }, [open]);
 
   const saveEdit = async () => {
+    const { monthlyStartAt, ...details } = edit;
+    const body = { ...details };
+    // Once subscribed, the first-charge date can no longer be changed.
+    if (client.subscriptionStatus !== "ACTIVE") {
+      body.monthlyStartAt = monthlyStartAt ? new Date(monthlyStartAt).toISOString() : null;
+    }
     const data = await call("edit", `/api/admin/clients/${client.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(edit)
+      body: JSON.stringify(body)
     });
     if (data) {
       setMsg("Saved.");
@@ -500,6 +522,7 @@ function ClientRow({ client, open, onToggle, onChanged }) {
   const totalCents = invoice.lines.reduce((sum, l) => sum + toCents(l.amountDollars), 0);
   const kindLabel = INVOICE_KINDS.find((k) => k.value === invoice.kind)?.label || "";
   const submitLabel = invoice.delivery === "later" ? "Schedule invoice" : "Send invoice now";
+  const subActive = client.subscriptionStatus === "ACTIVE";
 
   return (
     <>
@@ -512,7 +535,12 @@ function ClientRow({ client, open, onToggle, onChanged }) {
           {formatCents(client.oneTimeAmountCents)}
           {client.oneTimePaidAt && <span className="adm-paid">paid</span>}
         </td>
-        <td>{formatCents(client.monthlyAmountCents)}<span className="adm-muted">/mo</span></td>
+        <td>
+          {formatCents(client.monthlyAmountCents)}<span className="adm-muted">/mo</span>
+          {client.monthlyStartAt && client.subscriptionStatus !== "ACTIVE" && (
+            <span className="adm-when">first charge {formatDateTime(client.monthlyStartAt)}</span>
+          )}
+        </td>
         <td><span className={`adm-pill adm-pill-${SUB_TONE[client.subscriptionStatus] || "grey"}`}>{client.subscriptionStatus}</span></td>
         <td><span className={`adm-pill adm-pill-${client.isActive ? "green" : "grey"}`}>{client.isActive ? "Active" : "Deactivated"}</span></td>
         <td className="adm-right">
@@ -544,6 +572,26 @@ function ClientRow({ client, open, onToggle, onChanged }) {
                   </Field>
                   <Field label="Monthly (USD)">
                     <input className="adm-input" type="number" min="0" step="0.01" value={edit.monthlyAmountDollars} onChange={editField("monthlyAmountDollars")} />
+                  </Field>
+                  <Field
+                    label="First monthly charge"
+                    hint={subActive ? "Subscription already active" : "Leave empty to charge when the client subscribes."}
+                  >
+                    <div className="adm-when-row">
+                      <input
+                        className="adm-input"
+                        type="datetime-local"
+                        min={localInputMin()}
+                        value={edit.monthlyStartAt}
+                        onChange={editField("monthlyStartAt")}
+                        disabled={subActive}
+                      />
+                      {!subActive && edit.monthlyStartAt && (
+                        <button type="button" className="adm-btn adm-btn-ghost adm-btn-sm" onClick={() => setEdit((p) => ({ ...p, monthlyStartAt: "" }))}>
+                          Clear
+                        </button>
+                      )}
+                    </div>
                   </Field>
                 </div>
                 <div className="adm-actions">
@@ -648,13 +696,10 @@ function ClientRow({ client, open, onToggle, onChanged }) {
                   </div>
 
                   <div className="adm-totals">
-                    <div className="adm-totals-note">
-                      {invoice.kind === "MONTHLY" && "This total is billed every month, starting on the send date. The subscription is created on that date."}
-                    </div>
+                    <div className="adm-totals-note" />
                     <div className="adm-total">
                       <span>Total</span>
                       <strong>{formatCents(totalCents)}</strong>
-                      {invoice.kind === "MONTHLY" && <em>/ month</em>}
                     </div>
                   </div>
 

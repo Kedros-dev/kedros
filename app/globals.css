@@ -528,6 +528,9 @@ h1 em { color: #642dd4; font-style: normal; }
 
 .adm-totals { align-items: center; border-top: 2px solid #0f134e; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; padding-top: 14px; }
 .adm-totals-note { color: #656989; font-size: 12px; max-width: 420px; }
+.adm-when { color: #656989; display: block; font-size: 11px; margin-top: 2px; }
+.adm-when-row { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; }
+.adm-when-row input { flex: 1 1 200px; min-width: 0; }
 .adm-total { align-items: baseline; display: flex; gap: 10px; margin-left: auto; }
 .adm-total span { color: #656989; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
 .adm-total strong { color: #0f134e; font-family: "Manrope"; font-size: 28px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }

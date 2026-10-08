@@ -5,10 +5,9 @@ import { sendScheduledInvoice, serializeInvoice } from "@/lib/scheduled-invoices
 
 export const dynamic = "force-dynamic";
 
-const KINDS = ["SETUP_FEE", "MONTHLY", "CUSTOM"];
+const KINDS = ["SETUP_FEE", "CUSTOM"];
 const DEFAULT_TITLES = {
   SETUP_FEE: "Setup fee",
-  MONTHLY: "Monthly subscription",
   CUSTOM: "Invoice"
 };
 
@@ -51,15 +50,11 @@ export async function POST(request, { params }) {
   }
 
   const kind = String(body.kind || "");
-  if (!KINDS.includes(kind)) {
-    return NextResponse.json({ error: "Invoice kind must be setup fee, monthly, or custom." }, { status: 400 });
+  if (kind === "MONTHLY") {
+    return NextResponse.json({ error: "Set the monthly plan from the client details." }, { status: 400 });
   }
-
-  if (kind === "MONTHLY" && client.subscriptionStatus === "ACTIVE") {
-    return NextResponse.json(
-      { error: "This client already has an active subscription." },
-      { status: 400 }
-    );
+  if (!KINDS.includes(kind)) {
+    return NextResponse.json({ error: "Invoice kind must be setup fee or custom." }, { status: 400 });
   }
 
   if (!Array.isArray(body.lineItems) || body.lineItems.length === 0) {

@@ -38,6 +38,8 @@ model User {
   // Stripe linkage.
   stripeCustomerId String?              @unique
   oneTimePaidAt    DateTime?
+  // First charge date for the monthly plan (null = charge when the client subscribes).
+  monthlyStartAt   DateTime?
   subscriptionId   String?              @unique
   subscriptionStatus SubscriptionStatus @default(NONE)
 
@@ -82,4 +84,11 @@ model ScheduledInvoice {
   createdAt DateTime @default(now())
 
   @@index([status, sendAt])
+}
+
+// Dedup log for outgoing emails (e.g. receipts keyed "receipt:<invoiceId>"), so
+// webhook retries never send the same email twice.
+model EmailLog {
+  key       String   @id
+  createdAt DateTime @default(now())
 }

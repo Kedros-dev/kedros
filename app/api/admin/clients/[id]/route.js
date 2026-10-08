@@ -46,7 +46,8 @@ export async function GET(_request, { params }) {
       mustChangePassword: client.mustChangePassword,
       oneTimeAmountCents: client.oneTimeAmountCents,
       monthlyAmountCents: client.monthlyAmountCents,
-      subscriptionStatus: client.subscriptionStatus
+      subscriptionStatus: client.subscriptionStatus,
+      monthlyStartAt: client.monthlyStartAt
     },
     invoices,
     subscription
@@ -83,6 +84,17 @@ export async function PATCH(request, { params }) {
     data.monthlyAmountCents = Math.round(Number(body.monthlyAmountDollars || 0) * 100);
   }
   if (typeof body.isActive === "boolean") data.isActive = body.isActive;
+  if (body.monthlyStartAt !== undefined) {
+    if (body.monthlyStartAt === null || body.monthlyStartAt === "") {
+      data.monthlyStartAt = null;
+    } else {
+      const parsed = new Date(body.monthlyStartAt);
+      if (Number.isNaN(parsed.getTime())) {
+        return NextResponse.json({ error: "Monthly start date is not a valid date." }, { status: 400 });
+      }
+      data.monthlyStartAt = parsed;
+    }
+  }
 
   if (
     (data.oneTimeAmountCents !== undefined && data.oneTimeAmountCents < 0) ||

@@ -24,9 +24,19 @@ export async function POST(request) {
   const origin = request.headers.get("origin") || process.env.NEXTAUTH_URL;
   const customerId = await ensureStripeCustomer(prisma, user);
 
+  // A scheduled start at least 49 hours out (Stripe needs 48h) collects the card now
+  // and makes the first charge on that date. Otherwise we charge at signup as before.
+  const MIN_TRIAL_LEAD_MS = 49 * 60 * 60 * 1000;
+  const startAt = user.monthlyStartAt ? new Date(user.monthlyStartAt) : null;
+  const subscriptionData =
+    startAt && startAt.getTime() - Date.now() >= MIN_TRIAL_LEAD_MS
+      ? { trial_end: Math.floor(startAt.getTime() / 1000) }
+      : undefined;
+
   const checkoutSession = await stripe.checkout.sessions.create({
     mode: "subscription",
     customer: customerId,
+    ...(subscriptionData ? { subscription_data: subscriptionData } : {}),
     line_items: [
       {
         price_data: {

@@ -32,6 +32,7 @@ export async function GET() {
       subscriptionStatus: true,
       subscriptionId: true,
       isActive: true,
+      monthlyStartAt: true,
       createdAt: true
     }
   });
@@ -66,7 +67,7 @@ export async function POST(request) {
     return NextResponse.json({ error: "Amounts must be positive." }, { status: 400 });
   }
 
-  // Validate invoice timing before anything is created in the DB or Stripe.
+  // Validate invoice timing and the monthly plan before anything is created in the DB or Stripe.
   const now = new Date();
   const setupPlan = planClientInvoice({
     kind: "SETUP_FEE",
@@ -75,17 +76,33 @@ export async function POST(request) {
     at: setupSendAt,
     now
   });
-  const monthlyPlan = planClientInvoice({
-    kind: "MONTHLY",
-    amountCents: monthlyAmountCents,
-    mode: monthlyMode,
-    at: monthlyStartAt,
-    now
-  });
-  const timingError = setupPlan?.error || monthlyPlan?.error;
-  if (timingError) {
-    return NextResponse.json({ error: timingError }, { status: 400 });
+  if (setupPlan?.error) {
+    return NextResponse.json({ error: setupPlan.error }, { status: 400 });
   }
+
+  // "signup": the client subscribes from their account page (card charged then).
+  // "schedule": the client subscribes from their account page, and the first charge
+  // happens on monthlyStartAt (the card is still collected at signup).
+  const planMode = monthlyMode === undefined || monthlyMode === null || monthlyMode === "" ? "signup" : monthlyMode;
+  if (planMode !== "signup" && planMode !== "schedule") {
+    return NextResponse.json({ error: "Monthly start option is invalid." }, { status: 400 });
+  }
+
+  let monthlyStartDate = null;
+  if (planMode === "schedule") {
+    if (monthlyStartAt === undefined || monthlyStartAt === null || monthlyStartAt === "") {
+      return NextResponse.json({ error: "Choose a start date for the monthly plan." }, { status: 400 });
+    }
+    const parsed = new Date(monthlyStartAt);
+    if (Number.isNaN(parsed.getTime())) {
+      return NextResponse.json({ error: "Monthly start date is not a valid date." }, { status: 400 });
+    }
+    if (parsed.getTime() <= now.getTime()) {
+      return NextResponse.json({ error: "Monthly start date must be in the future." }, { status: 400 });
+    }
+    monthlyStartDate = parsed;
+  }
+  const storedMonthlyStartAt = monthlyAmountCents > 0 ? monthlyStartDate : null;
 
   const normalizedEmail = String(email).toLowerCase().trim();
 
@@ -110,14 +127,14 @@ export async function POST(request) {
       role: "CLIENT",
       oneTimeAmountCents,
       monthlyAmountCents,
+      monthlyStartAt: storedMonthlyStartAt,
       stripeCustomerId: customer.id,
       mustChangePassword: true
     }
   });
 
   const invoices = {
-    setup: await createClientInvoice(client.id, setupPlan),
-    monthly: await createClientInvoice(client.id, monthlyPlan)
+    setup: await createClientInvoice(client.id, setupPlan)
   };
 
   return NextResponse.json({

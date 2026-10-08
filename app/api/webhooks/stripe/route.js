@@ -1,8 +1,48 @@
 import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
+import { emailConfigured, sendEmail, receiptEmail } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
+
+// Email the client a receipt for a paid subscription invoice. Never throws: a
+// failure is logged and the dedup row removed so a webhook retry can resend it.
+async function sendSubscriptionReceipt(invoice) {
+  if (!emailConfigured()) return;
+
+  const or = [];
+  if (invoice.customer) or.push({ stripeCustomerId: invoice.customer });
+  if (invoice.subscription) or.push({ subscriptionId: invoice.subscription });
+  if (or.length === 0) return;
+
+  const user = await prisma.user.findFirst({ where: { OR: or } });
+  if (!user || !user.email) return;
+
+  const key = `receipt:${invoice.id}`;
+  try {
+    await prisma.emailLog.create({ data: { key } });
+  } catch (err) {
+    if (err?.code === "P2002") return; // Already sent for this invoice.
+    throw err;
+  }
+
+  try {
+    const firstLine = invoice.lines?.data?.[0]?.description;
+    const paidTs = invoice.status_transitions?.paid_at;
+    const message = receiptEmail({
+      name: user.name,
+      amountCents: invoice.amount_paid,
+      description: firstLine || "Monthly subscription",
+      paidAt: paidTs ? new Date(paidTs * 1000) : new Date(),
+      invoiceUrl: invoice.hosted_invoice_url,
+      pdfUrl: invoice.invoice_pdf
+    });
+    await sendEmail({ to: user.email, ...message });
+  } catch (err) {
+    console.error(`Receipt email for invoice ${invoice.id} failed:`, err.message);
+    await prisma.emailLog.delete({ where: { key } }).catch(() => {});
+  }
+}
 
 function mapSubscriptionStatus(stripeStatus) {
   if (stripeStatus === "active" || stripeStatus === "trialing") return "ACTIVE";
@@ -77,6 +117,13 @@ export async function POST(request) {
         await prisma.user
           .update({ where: { id: invoice.metadata.userId }, data: { oneTimePaidAt: new Date() } })
           .catch(() => {});
+      }
+      if (invoice.subscription && invoice.amount_paid > 0) {
+        try {
+          await sendSubscriptionReceipt(invoice);
+        } catch (err) {
+          console.error("Subscription receipt failed:", err.message);
+        }
       }
       break;
     }

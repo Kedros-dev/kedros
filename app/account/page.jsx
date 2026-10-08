@@ -35,6 +35,7 @@ export default async function AccountPage() {
         oneTimeAmountCents: user.oneTimeAmountCents,
         oneTimePaidAt: user.oneTimePaidAt,
         monthlyAmountCents: user.monthlyAmountCents,
+        monthlyStartAt: user.monthlyStartAt ? new Date(user.monthlyStartAt).toISOString() : null,
         subscriptionStatus: user.subscriptionStatus
       }}
       invoices={invoices}

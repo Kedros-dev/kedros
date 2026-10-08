@@ -19,6 +19,11 @@ function formatDate(unixSeconds) {
   });
 }
 
+function formatIsoDateTime(iso) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+}
+
 const INVOICE_LABELS = {
   paid: "Paid",
   open: "Due",
@@ -49,6 +54,9 @@ export default function AccountView({ user, invoices }) {
 
   const paid = Boolean(user.oneTimePaidAt);
   const subActive = user.subscriptionStatus === "ACTIVE";
+  const firstChargeAt = user.monthlyStartAt && new Date(user.monthlyStartAt).getTime() > Date.now()
+    ? user.monthlyStartAt
+    : null;
 
   return (
     <div className="dash-shell">
@@ -81,6 +89,17 @@ export default function AccountView({ user, invoices }) {
             <h3>Monthly subscription</h3>
             <span className={`dash-status dash-status-${user.subscriptionStatus.toLowerCase()}`}>{user.subscriptionStatus}</span>
             <p className="dash-amount">{formatCents(user.monthlyAmountCents)}/mo</p>
+            {!subActive && firstChargeAt && (
+              <p style={{ color: "#656989", fontSize: 13, margin: "0 0 12px" }}>
+                Your card is saved now; first charge on {formatIsoDateTime(firstChargeAt)}, then automatically every month.
+                <br />A receipt is emailed after each payment.
+              </p>
+            )}
+            {subActive && (
+              <p style={{ color: "#656989", fontSize: 13, margin: "0 0 12px" }}>
+                Charged automatically every month. A receipt is emailed after each payment.
+              </p>
+            )}
             {!subActive && user.monthlyAmountCents > 0 && (
               <button className="button button-primary" onClick={() => startCheckout("subscription")} disabled={loading === "subscription"}>
                 {loading === "subscription" ? "Redirecting..." : "Subscribe monthly"} <ArrowUpRight size={16} />
