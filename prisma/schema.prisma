@@ -40,4 +40,46 @@ model User {
   oneTimePaidAt    DateTime?
   subscriptionId   String?              @unique
   subscriptionStatus SubscriptionStatus @default(NONE)
+
+  scheduledInvoices ScheduledInvoice[]
+}
+
+enum InvoiceKind {
+  SETUP_FEE
+  MONTHLY
+  CUSTOM
+}
+
+enum InvoiceStatus {
+  SCHEDULED
+  SENDING
+  SENT
+  FAILED
+  CANCELED
+}
+
+model ScheduledInvoice {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  kind         InvoiceKind
+  title        String
+  lineItems    Json
+  totalCents   Int
+  memo         String?
+  daysUntilDue Int @default(7)
+
+  sendAt    DateTime
+  status    InvoiceStatus @default(SCHEDULED)
+  sentAt    DateTime?
+
+  stripeInvoiceId      String?
+  stripeSubscriptionId String?
+  hostedInvoiceUrl     String?
+  error                String?
+
+  createdAt DateTime @default(now())
+
+  @@index([status, sendAt])
 }
