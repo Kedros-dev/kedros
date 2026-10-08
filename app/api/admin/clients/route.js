@@ -76,16 +76,20 @@ export async function POST(request) {
     setupItemsCents = [];
     for (const item of setupLineItems) {
       const description = String(item?.description ?? "").trim();
-      const amountCents = Math.round(Number(item?.amountDollars) * 100);
+      const blank = String(item?.amountDollars ?? "").trim() === "";
+      const amountCents = blank ? NaN : Math.round(Number(item.amountDollars) * 100);
       if (!description) {
         return NextResponse.json({ error: "Every setup line item needs a description." }, { status: 400 });
       }
-      if (!Number.isFinite(amountCents) || amountCents <= 0) {
-        return NextResponse.json({ error: "Every setup line item needs an amount greater than zero." }, { status: 400 });
+      if (!Number.isFinite(amountCents) || amountCents < 0) {
+        return NextResponse.json({ error: "Every setup line item needs an amount of 0 or more." }, { status: 400 });
       }
       setupItemsCents.push({ description, amountCents });
     }
     oneTimeAmountCents = setupItemsCents.reduce((sum, li) => sum + li.amountCents, 0);
+    if (oneTimeAmountCents <= 0) {
+      return NextResponse.json({ error: "The invoice total must be more than $0." }, { status: 400 });
+    }
   }
   const setupMemoText = typeof setupMemo === "string" ? setupMemo.trim() : "";
 

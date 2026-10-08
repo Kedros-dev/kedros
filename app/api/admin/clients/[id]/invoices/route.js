@@ -64,13 +64,14 @@ export async function POST(request, { params }) {
   const lineItems = [];
   for (const item of body.lineItems) {
     const description = String(item?.description ?? "").trim();
-    const amountCents = Math.round(Number(item?.amountDollars) * 100);
+    const blank = String(item?.amountDollars ?? "").trim() === "";
+    const amountCents = blank ? NaN : Math.round(Number(item.amountDollars) * 100);
     if (!description) {
       return NextResponse.json({ error: "Every line item needs a description." }, { status: 400 });
     }
-    if (!Number.isFinite(amountCents) || amountCents <= 0) {
+    if (!Number.isFinite(amountCents) || amountCents < 0) {
       return NextResponse.json(
-        { error: "Every line item needs an amount greater than zero." },
+        { error: "Every line item needs an amount of 0 or more." },
         { status: 400 }
       );
     }
@@ -78,6 +79,9 @@ export async function POST(request, { params }) {
   }
 
   const totalCents = lineItems.reduce((sum, li) => sum + li.amountCents, 0);
+  if (totalCents <= 0) {
+    return NextResponse.json({ error: "The invoice total must be more than $0." }, { status: 400 });
+  }
 
   const now = new Date();
   let sendAt = now;

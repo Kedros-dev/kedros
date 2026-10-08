@@ -86,9 +86,18 @@ const EMPTY_CLIENT_FORM = {
   setupMemo: ""
 };
 
-// Rows with a description and an amount above zero.
+// A line amount in dollars when it is a number of 0 or more, otherwise null (blank, NaN or negative).
+// Compared against null, not truthiness, so "0" is a valid amount.
+function lineAmount(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+  const n = Number(text);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+// Rows with a description and a valid amount (0 or more).
 function completeSetupLines(lines) {
-  return lines.filter((l) => l.description.trim() && parseFloat(l.amountDollars) > 0);
+  return lines.filter((l) => l.description.trim() && lineAmount(l.amountDollars) !== null);
 }
 
 // Error message when a row has something filled in but is incomplete, otherwise "".
@@ -96,7 +105,7 @@ function setupLinesError(lines) {
   const filled = lines.filter((l) => l.description.trim() || String(l.amountDollars).trim());
   return filled.length === completeSetupLines(lines).length
     ? ""
-    : "Each line item needs a description and an amount above zero. Remove any incomplete rows.";
+    : "Each line item needs a description and an amount (0 or more). Remove any incomplete rows.";
 }
 
 // Timing select for a client invoice, plus a date picker when scheduling.
@@ -139,12 +148,16 @@ function lineItemsTotalCents(lines) {
   return completeSetupLines(lines).reduce((sum, l) => sum + toCents(l.amountDollars), 0);
 }
 
-// Error for the line-item editor: needs at least one complete row and no half-filled rows.
+// Error for the line-item editor: needs at least one complete row, no half-filled rows,
+// and a total above $0 (individual lines may be $0).
 function lineItemsProblem(lines) {
   if (completeSetupLines(lines).length === 0) {
-    return "Add at least one line item with a description and an amount above zero.";
+    return "Add at least one line item with a description and an amount (0 or more).";
   }
-  return setupLinesError(lines);
+  const rowsProblem = setupLinesError(lines);
+  if (rowsProblem) return rowsProblem;
+  if (lineItemsTotalCents(lines) <= 0) return "The total must be more than $0.";
+  return "";
 }
 
 // Saved invoice line items (cents) to editor rows (dollar strings).
@@ -343,7 +356,8 @@ export default function AdminPage() {
       monthlyMode: monthlyActive ? form.monthlyMode : "signup",
       setupMemo: form.setupMemo.trim()
     };
-    if (itemizing) {
+    // Itemized rows are only sent when they make a setup invoice (total above $0).
+    if (itemizing && setupActive) {
       payload.setupLineItems = itemsComplete.map((l) => ({
         description: l.description.trim(),
         amountDollars: Number(l.amountDollars)
@@ -693,18 +707,13 @@ function ClientRow({ client, open, onToggle, onChanged }) {
   const invField = (field) => (e) => setInvoice((p) => ({ ...p, [field]: e.target.value }));
 
   const submitInvoice = async () => {
-    const filled = invoice.lines.filter((l) => l.description.trim() || l.amountDollars.toString().trim());
-    const valid = filled.filter((l) => l.description.trim() && parseFloat(l.amountDollars) > 0);
-    if (valid.length === 0) {
+    const problem = lineItemsProblem(invoice.lines);
+    if (problem) {
       setMsg("");
-      setErr("Add at least one line item with a description and an amount above zero.");
+      setErr(problem);
       return;
     }
-    if (valid.length !== filled.length) {
-      setMsg("");
-      setErr("Each line item needs a description and an amount above zero. Remove any incomplete rows.");
-      return;
-    }
+    const valid = completeSetupLines(invoice.lines);
 
     const days = Number(invoice.daysUntilDue);
     if (!Number.isInteger(days) || days < 1) {

@@ -36,7 +36,8 @@ async function loadClientInvoice(params) {
   return { client, invoice };
 }
 
-// Same rules as the POST route: description required, amount > 0, stored as integer cents.
+// Same rules as the POST route: description required, amount 0 or more (blank is invalid),
+// stored as integer cents. The invoice total must be above $0.
 function parseLineItems(raw) {
   if (!Array.isArray(raw) || raw.length === 0) {
     return { error: "Add at least one line item." };
@@ -45,17 +46,22 @@ function parseLineItems(raw) {
   const lineItems = [];
   for (const item of raw) {
     const description = String(item?.description ?? "").trim();
-    const amountCents = Math.round(Number(item?.amountDollars) * 100);
+    const blank = String(item?.amountDollars ?? "").trim() === "";
+    const amountCents = blank ? NaN : Math.round(Number(item.amountDollars) * 100);
     if (!description) {
       return { error: "Every line item needs a description." };
     }
-    if (!Number.isFinite(amountCents) || amountCents <= 0) {
-      return { error: "Every line item needs an amount greater than zero." };
+    if (!Number.isFinite(amountCents) || amountCents < 0) {
+      return { error: "Every line item needs an amount of 0 or more." };
     }
     lineItems.push({ description, amountCents });
   }
 
-  return { lineItems, totalCents: lineItems.reduce((sum, li) => sum + li.amountCents, 0) };
+  const totalCents = lineItems.reduce((sum, li) => sum + li.amountCents, 0);
+  if (totalCents <= 0) {
+    return { error: "The invoice total must be more than $0." };
+  }
+  return { lineItems, totalCents };
 }
 
 // Decide when the invoice goes out. raw is the body's sendAt: undefined keeps
