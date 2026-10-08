@@ -474,6 +474,8 @@ h1 em { color: #642dd4; font-style: normal; }
 .adm-creds { display: grid; font-family: "DM Mono", monospace; font-size: 12px; gap: 4px 14px; grid-template-columns: max-content 1fr; margin: 10px 0 0; }
 .adm-creds dt { color: #656989; }
 .adm-creds dd { margin: 0; word-break: break-all; }
+.adm-creds-line { color: #0f134e; font-size: 13px; margin: 8px 0 0; }
+.adm-timing { align-content: start; display: grid; gap: 10px; min-width: 0; }
 
 .adm-table-wrap { background: #fff; border: 1px solid #e3e8f0; border-radius: 10px; box-shadow: 0 6px 24px rgba(15,19,78,.05); margin-top: 28px; overflow-x: auto; }
 .adm-table { border-collapse: collapse; min-width: 640px; width: 100%; }

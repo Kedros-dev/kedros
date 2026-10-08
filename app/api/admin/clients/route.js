@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
+import { planClientInvoice, createClientInvoice } from "@/lib/scheduled-invoices";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,16 @@ export async function POST(request) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json();
-  const { name, email, oneTimeAmountDollars, monthlyAmountDollars } = body;
+  const {
+    name,
+    email,
+    oneTimeAmountDollars,
+    monthlyAmountDollars,
+    setupMode,
+    setupSendAt,
+    monthlyMode,
+    monthlyStartAt
+  } = body;
 
   if (!name || !email) {
     return NextResponse.json({ error: "Name and email are required." }, { status: 400 });
@@ -54,6 +64,27 @@ export async function POST(request) {
 
   if (oneTimeAmountCents < 0 || monthlyAmountCents < 0) {
     return NextResponse.json({ error: "Amounts must be positive." }, { status: 400 });
+  }
+
+  // Validate invoice timing before anything is created in the DB or Stripe.
+  const now = new Date();
+  const setupPlan = planClientInvoice({
+    kind: "SETUP_FEE",
+    amountCents: oneTimeAmountCents,
+    mode: setupMode,
+    at: setupSendAt,
+    now
+  });
+  const monthlyPlan = planClientInvoice({
+    kind: "MONTHLY",
+    amountCents: monthlyAmountCents,
+    mode: monthlyMode,
+    at: monthlyStartAt,
+    now
+  });
+  const timingError = setupPlan?.error || monthlyPlan?.error;
+  if (timingError) {
+    return NextResponse.json({ error: timingError }, { status: 400 });
   }
 
   const normalizedEmail = String(email).toLowerCase().trim();
@@ -84,8 +115,14 @@ export async function POST(request) {
     }
   });
 
+  const invoices = {
+    setup: await createClientInvoice(client.id, setupPlan),
+    monthly: await createClientInvoice(client.id, monthlyPlan)
+  };
+
   return NextResponse.json({
     client: { id: client.id, name: client.name, email: client.email },
-    tempPassword
+    tempPassword,
+    invoices
   });
 }

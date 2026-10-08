@@ -58,10 +58,68 @@ function Field({ label, hint, span, children }) {
   );
 }
 
+const SETUP_TIMING_OPTIONS = [
+  { value: "now", label: "Send invoice now" },
+  { value: "schedule", label: "Schedule for a date" },
+  { value: "none", label: "Don't create yet" }
+];
+const MONTHLY_TIMING_OPTIONS = [
+  { value: "now", label: "Start subscription now" },
+  { value: "schedule", label: "Start on a date" },
+  { value: "none", label: "Don't start yet" }
+];
+
+const EMPTY_CLIENT_FORM = {
+  name: "",
+  email: "",
+  oneTimeAmountDollars: "",
+  monthlyAmountDollars: "",
+  setupMode: "now",
+  setupSendAt: "",
+  monthlyMode: "now",
+  monthlyStartAt: ""
+};
+
+// Timing select for a client invoice, plus a date picker when scheduling.
+function Timing({ label, hint, options, mode, at, onMode, onAt }) {
+  return (
+    <>
+      <Field label={label}>
+        <select className="adm-input" value={mode} onChange={(e) => onMode(e.target.value)}>
+          {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </Field>
+      {mode === "schedule" && (
+        <Field label="Date and time">
+          <input className="adm-input" type="datetime-local" min={localInputMin()} required value={at} onChange={(e) => onAt(e.target.value)} />
+        </Field>
+      )}
+      <span className="adm-hint">{hint}</span>
+    </>
+  );
+}
+
+// Returns an error message when a scheduled date is missing or not in the future.
+function scheduleError(active, mode, at, what) {
+  if (!active || mode !== "schedule") return "";
+  if (!at) return `Choose a date and time to ${what}.`;
+  if (new Date(at).getTime() <= Date.now()) return "The scheduled time must be in the future.";
+  return "";
+}
+
+// One-line summary of a created client invoice or subscription.
+function invoiceSummary(inv, monthly) {
+  const label = monthly ? "Subscription" : "Setup invoice";
+  if (inv.status === "SENT") return `${label}: ${monthly ? "started" : "sent"}`;
+  if (inv.status === "FAILED") return `${label}: failed: ${inv.error || "unknown error"}`;
+  if (inv.status === "SENDING") return `${label}: sending`;
+  return `${label}: scheduled for ${formatDateTime(inv.sendAt)}`;
+}
+
 export default function AdminPage() {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ name: "", email: "", oneTimeAmountDollars: "", monthlyAmountDollars: "" });
+  const [form, setForm] = useState(EMPTY_CLIENT_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [created, setCreated] = useState(null);
@@ -86,15 +144,41 @@ export default function AdminPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setSubmitting(true);
     setError("");
     setCreated(null);
     setCopied(false);
 
+    const setupActive = toCents(form.oneTimeAmountDollars) > 0;
+    const monthlyActive = toCents(form.monthlyAmountDollars) > 0;
+
+    const timingProblem =
+      scheduleError(setupActive, form.setupMode, form.setupSendAt, "send the setup invoice")
+      || scheduleError(monthlyActive, form.monthlyMode, form.monthlyStartAt, "start the subscription");
+    if (timingProblem) {
+      setError(timingProblem);
+      return;
+    }
+
+    const payload = {
+      name: form.name,
+      email: form.email,
+      oneTimeAmountDollars: form.oneTimeAmountDollars,
+      monthlyAmountDollars: form.monthlyAmountDollars,
+      setupMode: setupActive ? form.setupMode : "none",
+      monthlyMode: monthlyActive ? form.monthlyMode : "none"
+    };
+    if (payload.setupMode === "schedule") {
+      payload.setupSendAt = new Date(form.setupSendAt).toISOString();
+    }
+    if (payload.monthlyMode === "schedule") {
+      payload.monthlyStartAt = new Date(form.monthlyStartAt).toISOString();
+    }
+
+    setSubmitting(true);
     const res = await fetch("/api/admin/clients", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form)
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
     setSubmitting(false);
@@ -104,8 +188,8 @@ export default function AdminPage() {
       return;
     }
 
-    setCreated({ email: data.client.email, tempPassword: data.tempPassword });
-    setForm({ name: "", email: "", oneTimeAmountDollars: "", monthlyAmountDollars: "" });
+    setCreated({ email: data.client.email, tempPassword: data.tempPassword, invoices: data.invoices || {} });
+    setForm(EMPTY_CLIENT_FORM);
     loadClients();
   };
 
@@ -139,12 +223,38 @@ export default function AdminPage() {
           <div className="adm-grid-2">
             <Field label="Name"><input className="adm-input" required value={form.name} onChange={handleChange("name")} placeholder="Client business name" /></Field>
             <Field label="Email"><input className="adm-input" required type="email" value={form.email} onChange={handleChange("email")} placeholder="client@company.com" /></Field>
-            <Field label="Setup fee (USD)" hint="Billed as the first invoice">
-              <input className="adm-input" required type="number" min="0" step="0.01" value={form.oneTimeAmountDollars} onChange={handleChange("oneTimeAmountDollars")} placeholder="2500" />
-            </Field>
-            <Field label="Monthly subscription (USD)">
-              <input className="adm-input" required type="number" min="0" step="0.01" value={form.monthlyAmountDollars} onChange={handleChange("monthlyAmountDollars")} placeholder="150" />
-            </Field>
+            <div className="adm-timing">
+              <Field label="Setup fee (USD)">
+                <input className="adm-input" required type="number" min="0" step="0.01" value={form.oneTimeAmountDollars} onChange={handleChange("oneTimeAmountDollars")} placeholder="2500" />
+              </Field>
+              {toCents(form.oneTimeAmountDollars) > 0 && (
+                <Timing
+                  label="Setup invoice"
+                  hint="Emailed as an invoice on the date you choose."
+                  options={SETUP_TIMING_OPTIONS}
+                  mode={form.setupMode}
+                  at={form.setupSendAt}
+                  onMode={(setupMode) => setForm((p) => ({ ...p, setupMode }))}
+                  onAt={(setupSendAt) => setForm((p) => ({ ...p, setupSendAt }))}
+                />
+              )}
+            </div>
+            <div className="adm-timing">
+              <Field label="Monthly subscription (USD)">
+                <input className="adm-input" required type="number" min="0" step="0.01" value={form.monthlyAmountDollars} onChange={handleChange("monthlyAmountDollars")} placeholder="150" />
+              </Field>
+              {toCents(form.monthlyAmountDollars) > 0 && (
+                <Timing
+                  label="Subscription start"
+                  hint="The subscription starts on the date you choose; Stripe then emails an invoice every month."
+                  options={MONTHLY_TIMING_OPTIONS}
+                  mode={form.monthlyMode}
+                  at={form.monthlyStartAt}
+                  onMode={(monthlyMode) => setForm((p) => ({ ...p, monthlyMode }))}
+                  onAt={(monthlyStartAt) => setForm((p) => ({ ...p, monthlyStartAt }))}
+                />
+              )}
+            </div>
           </div>
 
           {error && <p className="adm-alert-error">{error}</p>}
@@ -163,6 +273,8 @@ export default function AdminPage() {
                   <dt>Email</dt><dd>{created.email}</dd>
                   <dt>Temporary password</dt><dd>{created.tempPassword}</dd>
                 </dl>
+                {created.invoices?.setup && <p className="adm-creds-line">{invoiceSummary(created.invoices.setup, false)}</p>}
+                {created.invoices?.monthly && <p className="adm-creds-line">{invoiceSummary(created.invoices.monthly, true)}</p>}
               </div>
               <button type="button" className="adm-btn adm-btn-ghost adm-btn-sm" onClick={copyCredentials}>
                 {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? "Copied" : "Copy details"}
