@@ -53,19 +53,41 @@ export async function POST(request) {
     setupMode,
     setupSendAt,
     monthlyMode,
-    monthlyStartAt
+    monthlyStartAt,
+    setupLineItems,
+    setupMemo
   } = body;
 
   if (!name || !email) {
     return NextResponse.json({ error: "Name and email are required." }, { status: 400 });
   }
 
-  const oneTimeAmountCents = Math.round(Number(oneTimeAmountDollars || 0) * 100);
+  let oneTimeAmountCents = Math.round(Number(oneTimeAmountDollars || 0) * 100);
   const monthlyAmountCents = Math.round(Number(monthlyAmountDollars || 0) * 100);
 
   if (oneTimeAmountCents < 0 || monthlyAmountCents < 0) {
     return NextResponse.json({ error: "Amounts must be positive." }, { status: 400 });
   }
+
+  // Itemized setup fee: when line items are given, they define the setup fee total.
+  // Validated here, before anything is created in the DB or Stripe.
+  let setupItemsCents = null;
+  if (Array.isArray(setupLineItems) && setupLineItems.length > 0) {
+    setupItemsCents = [];
+    for (const item of setupLineItems) {
+      const description = String(item?.description ?? "").trim();
+      const amountCents = Math.round(Number(item?.amountDollars) * 100);
+      if (!description) {
+        return NextResponse.json({ error: "Every setup line item needs a description." }, { status: 400 });
+      }
+      if (!Number.isFinite(amountCents) || amountCents <= 0) {
+        return NextResponse.json({ error: "Every setup line item needs an amount greater than zero." }, { status: 400 });
+      }
+      setupItemsCents.push({ description, amountCents });
+    }
+    oneTimeAmountCents = setupItemsCents.reduce((sum, li) => sum + li.amountCents, 0);
+  }
+  const setupMemoText = typeof setupMemo === "string" ? setupMemo.trim() : "";
 
   // Validate invoice timing and the monthly plan before anything is created in the DB or Stripe.
   const now = new Date();
@@ -74,7 +96,9 @@ export async function POST(request) {
     amountCents: oneTimeAmountCents,
     mode: setupMode,
     at: setupSendAt,
-    now
+    now,
+    lineItems: setupItemsCents,
+    memo: setupMemoText
   });
   if (setupPlan?.error) {
     return NextResponse.json({ error: setupPlan.error }, { status: 400 });

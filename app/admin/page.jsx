@@ -81,8 +81,23 @@ const EMPTY_CLIENT_FORM = {
   setupMode: "now",
   setupSendAt: "",
   monthlyMode: "signup",
-  monthlyStartAt: ""
+  monthlyStartAt: "",
+  setupLines: [],
+  setupMemo: ""
 };
+
+// Rows with a description and an amount above zero.
+function completeSetupLines(lines) {
+  return lines.filter((l) => l.description.trim() && parseFloat(l.amountDollars) > 0);
+}
+
+// Error message when a row has something filled in but is incomplete, otherwise "".
+function setupLinesError(lines) {
+  const filled = lines.filter((l) => l.description.trim() || String(l.amountDollars).trim());
+  return filled.length === completeSetupLines(lines).length
+    ? ""
+    : "Each line item needs a description and an amount above zero. Remove any incomplete rows.";
+}
 
 // Timing select for a client invoice, plus a date picker when scheduling.
 function Timing({ label, hint, options, mode, at, onMode, onAt }) {
@@ -129,6 +144,33 @@ export default function AdminPage() {
   const [created, setCreated] = useState(null);
   const [copied, setCopied] = useState(false);
   const [openId, setOpenId] = useState(null);
+  const [itemizeOpen, setItemizeOpen] = useState(false);
+
+  // When at least one complete line item exists, the setup fee is their sum.
+  const itemsComplete = completeSetupLines(form.setupLines);
+  const itemizing = itemsComplete.length > 0;
+  const itemsTotalCents = itemsComplete.reduce((sum, l) => sum + toCents(l.amountDollars), 0);
+  const setupCents = itemizing ? itemsTotalCents : toCents(form.oneTimeAmountDollars);
+
+  const updateSetupLines = (fn) => setForm((p) => ({ ...p, setupLines: fn(p.setupLines) }));
+  const setSetupLine = (index, field, value) =>
+    updateSetupLines((lines) => lines.map((l, i) => (i === index ? { ...l, [field]: value } : l)));
+  const removeSetupLine = (index) => updateSetupLines((lines) => lines.filter((_, i) => i !== index));
+  const addSetupLine = () => updateSetupLines((lines) => [...lines, { description: "", amountDollars: "" }]);
+
+  const toggleItemize = () => {
+    if (!itemizeOpen) {
+      // Opening prefills a "Setup fee" row from the plain amount, if one is entered.
+      setForm((p) => {
+        if (p.setupLines.length > 0) return p;
+        const row = toCents(p.oneTimeAmountDollars) > 0
+          ? { description: "Setup fee", amountDollars: p.oneTimeAmountDollars }
+          : { description: "", amountDollars: "" };
+        return { ...p, setupLines: [row] };
+      });
+    }
+    setItemizeOpen(!itemizeOpen);
+  };
 
   const loadClients = async () => {
     setLoading(true);
@@ -152,7 +194,13 @@ export default function AdminPage() {
     setCreated(null);
     setCopied(false);
 
-    const setupActive = toCents(form.oneTimeAmountDollars) > 0;
+    const linesProblem = setupLinesError(form.setupLines);
+    if (linesProblem) {
+      setError(linesProblem);
+      return;
+    }
+
+    const setupActive = setupCents > 0;
     const monthlyActive = toCents(form.monthlyAmountDollars) > 0;
 
     const timingProblem =
@@ -166,11 +214,18 @@ export default function AdminPage() {
     const payload = {
       name: form.name,
       email: form.email,
-      oneTimeAmountDollars: form.oneTimeAmountDollars,
+      oneTimeAmountDollars: itemizing ? (itemsTotalCents / 100).toString() : form.oneTimeAmountDollars,
       monthlyAmountDollars: form.monthlyAmountDollars,
       setupMode: setupActive ? form.setupMode : "none",
-      monthlyMode: monthlyActive ? form.monthlyMode : "signup"
+      monthlyMode: monthlyActive ? form.monthlyMode : "signup",
+      setupMemo: form.setupMemo.trim()
     };
+    if (itemizing) {
+      payload.setupLineItems = itemsComplete.map((l) => ({
+        description: l.description.trim(),
+        amountDollars: Number(l.amountDollars)
+      }));
+    }
     if (payload.setupMode === "schedule") {
       payload.setupSendAt = new Date(form.setupSendAt).toISOString();
     }
@@ -200,6 +255,7 @@ export default function AdminPage() {
       monthlyStartAt: payload.monthlyStartAt || null
     });
     setForm(EMPTY_CLIENT_FORM);
+    setItemizeOpen(false);
     loadClients();
   };
 
@@ -234,10 +290,73 @@ export default function AdminPage() {
             <Field label="Name"><input className="adm-input" required value={form.name} onChange={handleChange("name")} placeholder="Client business name" /></Field>
             <Field label="Email"><input className="adm-input" required type="email" value={form.email} onChange={handleChange("email")} placeholder="client@company.com" /></Field>
             <div className="adm-timing">
-              <Field label="Setup fee (USD)">
-                <input className="adm-input" required type="number" min="0" step="0.01" value={form.oneTimeAmountDollars} onChange={handleChange("oneTimeAmountDollars")} placeholder="2500" />
+              <Field label="Setup fee (USD)" hint={itemizing ? "Total of the line items." : undefined}>
+                <input
+                  className="adm-input"
+                  required
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={itemizing ? (itemsTotalCents / 100).toFixed(2) : form.oneTimeAmountDollars}
+                  onChange={handleChange("oneTimeAmountDollars")}
+                  placeholder="2500"
+                  disabled={itemizing}
+                />
               </Field>
-              {toCents(form.oneTimeAmountDollars) > 0 && (
+              <div>
+                <button type="button" className="adm-btn adm-btn-ghost adm-btn-sm" onClick={toggleItemize} aria-expanded={itemizeOpen}>
+                  {itemizeOpen ? "Hide itemize / notes" : "Itemize / add notes"}
+                </button>
+              </div>
+              {itemizeOpen && (
+                <>
+                  <table className="adm-lines">
+                    <thead>
+                      <tr>
+                        <th>Description</th>
+                        <th className="adm-right">Amount (USD)</th>
+                        <th aria-label="Remove"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {form.setupLines.map((line, i) => (
+                        <tr key={i}>
+                          <td>
+                            <input className="adm-input adm-input-plain" value={line.description} onChange={(e) => setSetupLine(i, "description", e.target.value)} placeholder="Description" />
+                          </td>
+                          <td>
+                            <div className="adm-money">
+                              <span>$</span>
+                              <input className="adm-input adm-input-plain" type="number" min="0" step="0.01" value={line.amountDollars} onChange={(e) => setSetupLine(i, "amountDollars", e.target.value)} placeholder="0.00" />
+                            </div>
+                          </td>
+                          <td className="adm-right">
+                            <button type="button" className="adm-icon-btn" aria-label="Remove line item" onClick={() => removeSetupLine(i)}>
+                              <X size={15} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="adm-lines-foot">
+                    <button type="button" className="adm-btn adm-btn-ghost adm-btn-sm" onClick={addSetupLine}>
+                      <Plus size={14} /> Add line item
+                    </button>
+                  </div>
+                  <div className="adm-totals">
+                    <div className="adm-totals-note" />
+                    <div className="adm-total">
+                      <span>Total</span>
+                      <strong>{formatCents(itemsTotalCents)}</strong>
+                    </div>
+                  </div>
+                  <Field label="Notes (optional)" hint="Printed on the setup invoice.">
+                    <textarea className="adm-input adm-textarea" rows={3} value={form.setupMemo} onChange={handleChange("setupMemo")} placeholder="Initial build $200, domain $15 ..." />
+                  </Field>
+                </>
+              )}
+              {setupCents > 0 && (
                 <Timing
                   label="Setup invoice"
                   hint="Emailed as an invoice on the date you choose."
@@ -420,7 +539,7 @@ function ClientRow({ client, open, onToggle, onChanged }) {
   };
 
   const deleteClient = async () => {
-    if (!window.confirm(`Permanently delete ${client.name}? Their Stripe invoice history is kept, but the login and account are removed.`)) {
+    if (!window.confirm(`Permanently delete ${client.name}? The login is removed, unpaid invoices are voided so their payment links stop working, and paid invoice history and receipts are kept in Stripe.`)) {
       return;
     }
     const data = await call("delete", `/api/admin/clients/${client.id}`, { method: "DELETE" });

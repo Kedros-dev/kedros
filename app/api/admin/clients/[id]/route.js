@@ -119,8 +119,48 @@ export async function PATCH(request, { params }) {
   return NextResponse.json({ ok: true, isActive: updated.isActive });
 }
 
-// Permanently remove a client account. Best-effort cancels their subscription;
-// the Stripe customer + invoice history are left intact as the billing record.
+// Void a client's open invoices (so their payment links stop working) and delete
+// their drafts (drafts cannot be voided). Paid invoices are never touched. Every
+// Stripe call is best-effort: failures are logged and skipped.
+async function retireUnpaidInvoices(customerId) {
+  const MAX_PAGES = 5;
+  for (const status of ["open", "draft"]) {
+    let startingAfter;
+    for (let page = 0; page < MAX_PAGES; page++) {
+      let list;
+      try {
+        list = await stripe.invoices.list({
+          customer: customerId,
+          status,
+          limit: 100,
+          ...(startingAfter ? { starting_after: startingAfter } : {})
+        });
+      } catch (err) {
+        console.warn(`Could not list ${status} invoices on delete:`, err.message);
+        break;
+      }
+
+      for (const inv of list.data) {
+        try {
+          if (status === "open") {
+            await stripe.invoices.voidInvoice(inv.id);
+          } else {
+            await stripe.invoices.del(inv.id);
+          }
+        } catch (err) {
+          console.warn(`Could not retire ${status} invoice ${inv.id} on delete:`, err.message);
+        }
+      }
+
+      if (!list.has_more || list.data.length === 0) break;
+      startingAfter = list.data[list.data.length - 1].id;
+    }
+  }
+}
+
+// Permanently remove a client account. Best-effort cancels their subscription and
+// retires their unpaid invoices so payment links stop working. The Stripe customer
+// and paid invoice history are left intact as the billing record.
 export async function DELETE(_request, { params }) {
   if (!(await requireAdmin())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -137,6 +177,10 @@ export async function DELETE(_request, { params }) {
     } catch (err) {
       console.warn("Could not cancel subscription on delete:", err.message);
     }
+  }
+
+  if (client.stripeCustomerId) {
+    await retireUnpaidInvoices(client.stripeCustomerId);
   }
 
   await prisma.user.delete({ where: { id: client.id } });
