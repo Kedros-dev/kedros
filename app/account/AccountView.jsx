@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowUpRight } from "lucide-react";
 import BrandMark from "../BrandMark";
+import TermsModal from "./TermsModal";
 
 function formatCents(cents) {
   return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -32,7 +34,14 @@ const INVOICE_LABELS = {
   void: "Void"
 };
 
-export default function AccountView({ user, invoices }) {
+export default function AccountView({ user, invoices, showTerms = false }) {
+  const router = useRouter();
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const handleTermsAccepted = () => {
+    setTermsAccepted(true);
+    router.refresh();
+  };
+
   const [loading, setLoading] = useState(null);
   const [error, setError] = useState("");
 
@@ -144,6 +153,7 @@ export default function AccountView({ user, invoices }) {
           </table>
         </div>
       </div>
+      {showTerms && !termsAccepted && <TermsModal onAccepted={handleTermsAccepted} />}
     </div>
   );
 }

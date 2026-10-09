@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
 import { mapInvoice } from "@/lib/invoices";
+import { mustAcceptTerms } from "@/lib/terms";
 import AccountView from "./AccountView";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +40,7 @@ export default async function AccountPage() {
         subscriptionStatus: user.subscriptionStatus
       }}
       invoices={invoices}
+      showTerms={mustAcceptTerms(user)}
     />
   );
 }

@@ -43,6 +43,12 @@ model User {
   subscriptionId   String?              @unique
   subscriptionStatus SubscriptionStatus @default(NONE)
 
+  // Service terms acceptance, and a login counter used to re-prompt every 3 logins (CLIENT users).
+  loginCount           Int       @default(0)
+  termsVersion         Int?
+  termsAcceptedAt      DateTime?
+  termsAcceptedAtLogin Int       @default(0)
+
   scheduledInvoices ScheduledInvoice[]
 }
 
